@@ -11,10 +11,10 @@ def getTotalFreq(dataframe,dept):
 #get avg. freq per order
 def getAvgFreqOrder(dataframe,dept):
     orders = dataframe.ORDER_KEY.unique().tolist()
+    items =[]
     for order in orders:
         temp = dataframe[dataframe['ORDER_KEY']==order]
         x = temp.groupby('DEPARTMENT_NAME').size().to_dict()
-        items = []
         if dept in x:
             items.append(x[dept])
         else:
