@@ -1,10 +1,22 @@
 import numpy as np
+import pandas as pd
+import math
+from datetime import datetime as dt, timedelta
+from sklearn import preprocessing
 
 #convert Ilink
 def convertIlink(ilink):
     s = str(ilink)
     r = 10-len(s)
     return '0'*r + s
+
+#function to get dataframes/datasets based on start,end date
+#dates are str type in format example: '2017-5-1' or 'year-month-day'
+def getDF(dataframe,start,end):
+    DF = dataframe.copy()
+    start_date = dt.strptime(start,'%Y-%m-%d').date()
+    end_date = dt.strptime(end,'%Y-%m-%d').date()
+    return DF.loc[(DF.ORDER_DATE >= start_date) & (DF.ORDER_DATE < end_date)]
 
 #get frequency totals for specific departments: woven shirts, dresses, knit tops, and pants
 def getTotalFreq(dataframe,dept):
@@ -34,7 +46,7 @@ def getTotalAmts(dataframe,dept):
     goods = temp.SHIPPED_COST_AMT.sum().round(2)
     gross = temp.SHIPPED_GROSS_AMT.sum().round(2)
     sold = temp.SHIPPED_SOLD_AMT.sum().round(2)
-    discount = temp.discount.sum().round(2)
+    discount = temp.DISCOUNT.sum().round(2)
     return orig_retail,goods,gross,sold,discount
 
 #Get Avg Costs per order for depts
@@ -51,7 +63,7 @@ def getAvgAmtsOrder(dataframe,dept):
         goods.append(temp.SHIPPED_COST_AMT.sum().round(2))
         gross.append(temp.SHIPPED_GROSS_AMT.sum().round(2))
         sold.append(temp.SHIPPED_SOLD_AMT.sum().round(2))
-        discount.append(temp.discount.sum().round(2))
+        discount.append(temp.DISCOUNT.sum().round(2))
     return np.mean(orig).round(2), np.mean(goods).round(2), np.mean(gross).round(2), np.mean(sold).round(2),np.mean(discount).round(2)
 
 #Get Avg. Amount for Dept Item that this customer bought
@@ -61,10 +73,10 @@ def getAvgAmtItem(dataframe,dept):
     goods = round(temp.SHIPPED_COST_AMT.mean(),2)
     gross = round(temp.SHIPPED_GROSS_AMT.mean(),2)
     sold = round(temp.SHIPPED_SOLD_AMT.mean(),2)
-    margin = round(temp.margin.mean(),2)
-    discount = round(temp.discount.mean(),2)
-    markdown = round(temp.markdown.mean(),2)
-    discount_plus = round(temp.discount_plus.mean(),2)
+    margin = round(temp.MARGIN.mean(),2)
+    discount = round(temp.DISCOUNT.mean(),2)
+    markdown = round(temp.MARKDOWN.mean(),2)
+    discount_plus = round(temp.DISCOUNT_PLUS.mean(),2)
     return orig_retail,goods,gross,sold,discount#,margin,discount,markdown,discount_plus
 
 #getAge
@@ -226,14 +238,29 @@ def CLV(dataframe):
     agm = AvgGrossMargin(dataframe)
     return (T*aov)*agm*alt
 """
+def getCustTheta(ilinks,dataframe):
+    depts = ['Woven Shirts','Knit Tops','Dresses','Pants']
+    K = 4 #Number of Depts/topics
+    UserTheta = {}
+    for ilink in ilinks:
+        dfCust = dataframe.loc[(dataframe.ILINK==ilink)]
+        N_u = dfCust.shape[0]
+        fts = []
+        UserTheta[ilink] = {}
+        for dept in depts:
+            N = getTotalFreq(dfCust,dept)
+            n = getAvgFreqOrder(dfCust,dept)
+            O,Q,G,S,D = getTotalAmts(dfCust,dept)
+            o,q,g,s,d = getAvgAmtsOrder(dfCust,dept)
+            oi,qi,gi,si,di = getAvgAmtItem(dfCust,dept)
+            alpha = [N,S,D]
+            alpha = [0 if math.isnan(x) else x for x in alpha]
+            alpha1 = preprocessing.normalize(np.array(alpha).reshape(1,-1))
+            theta = (N + alpha1)/(N_u + K*alpha1)
+            UserTheta[ilink][dept] = theta
+    return UserTheta
 
-def getTableRating(ilinks,dataframe,cols):
-    """
-    cols = ['Ilink','N_ws','n_ws','S_ws','s_ws','si_ws','D_ws','d_ws','di_ws','R_ws',
-        'N_kt','n_kt','S_kt','s_kt','si_kt','D_kt','d_kt','di_kt','R_kt',
-        'N_d','n_d','S_d','s_d','si_d','D_d','d_d','di_d','R_d',
-        'N_p','n_p','S_p','s_p','si_p','D_p','d_p','di_p','R_p']
-    """
+def getTableRating(ilinks,dataframe,cols,UserTheta):
     tab = pd.DataFrame([],columns=cols)
     #need to create rows that describe a customers freq and sales of items in specific departments
     depts = ['Woven Shirts','Knit Tops','Dresses','Pants']
@@ -241,28 +268,20 @@ def getTableRating(ilinks,dataframe,cols):
     for ilink in ilinks:
         dfCust = dataframe.loc[(dataframe.ILINK==ilink)]
         if ~dfCust.empty:
-            N_u = dfCust.shape[0]#sum([f.getTotalFreq(dfCust,dept) for dept in depts])
-            #print ilink,N_u
+            N_u = dfCust.shape[0]
             fts = []
             for dept in depts:
-                N = f.getTotalFreq(dfCust,dept)
-                n = f.getAvgFreqOrder(dfCust,dept)
-                O,Q,G,S,D = f.getTotalAmts(dfCust,dept)
-                o,q,g,s,d = f.getAvgAmtsOrder(dfCust,dept)
-                oi,qi,gi,si,di = f.getAvgAmtItem(dfCust,dept)
-                alpha = [N,n,S,s,si,D,d,di]
-                #alpha = [S,s,si,D,d,di]
-                #alpha = [N,S,s,si]
+                N = getTotalFreq(dfCust,dept)
+                n = getAvgFreqOrder(dfCust,dept)
+                O,Q,G,S,D = getTotalAmts(dfCust,dept)
+                o,q,g,s,d = getAvgAmtsOrder(dfCust,dept)
+                oi,qi,gi,si,di = getAvgAmtItem(dfCust,dept)
+                alpha = [N,S,D]
                 alpha = [0 if math.isnan(x) else x for x in alpha]
-                alpha1 = np.array(normalize(alpha))
-                sigma = UserSigma[ilink][dept]
-                #sigma = (N + alpha1)/(N_u + K*alpha1)
-                pref = np.dot(sigma,alpha1).round(2)
-                #print ilink,alpha
-                #print sigma
-                #print ''
-                fts.append(alpha+[pref])
-                #fts2.append(alpha)
+                alpha1 = preprocessing.normalize(np.array(alpha).reshape(1,-1))
+                theta = UserTheta[ilink][dept]
+                propensity = np.dot(theta[0],alpha1[0]).round(2)
+                fts.append(alpha+[propensity])
         else:
             pass
         row = [i for sub in fts for i in sub]
@@ -271,6 +290,37 @@ def getTableRating(ilinks,dataframe,cols):
         tab = pd.concat([tab,temp])
     return tab
 
+def getTableRatingV2(ilinks,dataframe,cols):
+    tab = pd.DataFrame([],columns=cols)
+    #need to create rows that describe a customers freq and sales of items in specific departments
+    depts = ['Woven Shirts','Knit Tops','Dresses','Pants']
+    K = 4 #Number of Depts/topics
+    for ilink in ilinks:
+        dfCust = dataframe.loc[(dataframe.ILINK==ilink)]
+        if ~dfCust.empty:
+            N_u = dfCust.shape[0]
+            #print ilink,N_u
+            fts = []
+            for dept in depts:
+                N = getTotalFreq(dfCust,dept)
+                n = getAvgFreqOrder(dfCust,dept)
+                O,Q,G,S,D = getTotalAmts(dfCust,dept)
+                o,q,g,s,d = getAvgAmtsOrder(dfCust,dept)
+                oi,qi,gi,si,di = getAvgAmtItem(dfCust,dept)
+                alpha = [N,n,S,s,si,D,d,di]
+                alpha = [0 if math.isnan(x) else x for x in alpha]
+                alpha1 = preprocessing.normalize(np.array(alpha).reshape(1,-1))
+                theta = (N + alpha1)/(N_u + K*alpha1)
+                pref = np.dot(theta[0],alpha1[0]).round(2)
+                fts.append(alpha+[pref])
+        else:
+            pass
+        row = [i for sub in fts for i in sub]
+        row.insert(0,ilink)
+        temp = pd.DataFrame([tuple(row)],columns=cols)
+        tab = pd.concat([tab,temp])
+    return tab
+                     
 #This function will get the customers highest Rating pref
 #It checks the rating first
 #if ratings are equal it checks for freq, total sold/sales as tiebreakers in that order
