@@ -25,7 +25,7 @@ def getTotalFreq(dataframe,dept):
         return x[dept]
     else:
         return 0
-    
+
 #get avg. freq per order
 def getAvgFreqOrder(dataframe,dept):
     orders = dataframe.ORDER_KEY.unique().tolist()
@@ -42,12 +42,12 @@ def getAvgFreqOrder(dataframe,dept):
 #Get Total Costs for specific depts
 def getTotalAmts(dataframe,dept):
     temp = dataframe[dataframe.DEPARTMENT_NAME==dept]
-    orig_retail = temp.ORIGINAL_RETAIL_PRICE_AMT.sum().round(2)
-    goods = temp.SHIPPED_COST_AMT.sum().round(2)
-    gross = temp.SHIPPED_GROSS_AMT.sum().round(2)
+    #orig_retail = temp.ORIGINAL_RETAIL_PRICE_AMT.sum().round(2)
+    #goods = temp.SHIPPED_COST_AMT.sum().round(2)
+    #gross = temp.SHIPPED_GROSS_AMT.sum().round(2)
     sold = temp.SHIPPED_SOLD_AMT.sum().round(2)
     discount = temp.DISCOUNT.sum().round(2)
-    return orig_retail,goods,gross,sold,discount
+    return sold,discount
 
 #Get Avg Costs per order for depts
 def getAvgAmtsOrder(dataframe,dept):
@@ -59,12 +59,12 @@ def getAvgAmtsOrder(dataframe,dept):
     discount = []
     for order in orders:
         temp = dataframe[(dataframe.DEPARTMENT_NAME==dept) & (dataframe.ORDER_KEY==order)]
-        orig.append(temp.ORIGINAL_RETAIL_PRICE_AMT.sum().round(2))
-        goods.append(temp.SHIPPED_COST_AMT.sum().round(2))
-        gross.append(temp.SHIPPED_GROSS_AMT.sum().round(2))
+        #orig.append(temp.ORIGINAL_RETAIL_PRICE_AMT.sum().round(2))
+        #goods.append(temp.SHIPPED_COST_AMT.sum().round(2))
+        #gross.append(temp.SHIPPED_GROSS_AMT.sum().round(2))
         sold.append(temp.SHIPPED_SOLD_AMT.sum().round(2))
         discount.append(temp.DISCOUNT.sum().round(2))
-    return np.mean(orig).round(2), np.mean(goods).round(2), np.mean(gross).round(2), np.mean(sold).round(2),np.mean(discount).round(2)
+    return np.mean(sold).round(2),np.mean(discount).round(2)
 
 #Get Avg. Amount for Dept Item that this customer bought
 def getAvgAmtItem(dataframe,dept):
@@ -112,9 +112,9 @@ def getLengthMembership(dataframe):
         openDate = dt.strptime(dataframe.JJCH_OPEN_DATE.unique()[0],'%Y-%m-%d').date()
         length = (dt.now().date()-openDate).days/365
         return length,'Current'
-    
+
 #get END_USE stats
-#get frequency totals 
+#get frequency totals
 def getTotalFreqEndUse(dataframe):
     x = dataframe.groupby('END_USE_DESC').size().to_dict()
     x = x.to_dict()
@@ -215,29 +215,7 @@ def AvgGrossMargin(dataframe):
     costs = dataframe.SHIPPED_COST_AMT
     gross_margin = (sold-costs)/sold
     return gross_margin.mean()
-"""
-def AvgLifeSpan(dataframe):
-    years = [2014,2015,2016,2017]
-    n = 1
-    alt = 0
-    for year in years:
-        temp = dataframe[dataframe.ORDER_DATE.dt.year == year]
-        N = len(temp.ORDER_DATE.dt.month.unique())
-        alt += N#*n
-        #print N,n,alt
-        if N > 0 & year != 2014:
-            n += 1
-        else:
-            n = 1
-    return alt
 
-def CLV(dataframe):
-    T = AvgMonthlyTrans(dataframe)
-    aov = AvgOrderValue(dataframe)
-    alt = AvgLifeSpan(dataframe)
-    agm = AvgGrossMargin(dataframe)
-    return (T*aov)*agm*alt
-"""
 def getCustTheta(ilinks,dataframe):
     depts = ['Woven Shirts','Knit Tops','Dresses','Pants']
     K = 4 #Number of Depts/topics
@@ -249,10 +227,7 @@ def getCustTheta(ilinks,dataframe):
         UserTheta[ilink] = {}
         for dept in depts:
             N = getTotalFreq(dfCust,dept)
-            n = getAvgFreqOrder(dfCust,dept)
-            O,Q,G,S,D = getTotalAmts(dfCust,dept)
-            o,q,g,s,d = getAvgAmtsOrder(dfCust,dept)
-            oi,qi,gi,si,di = getAvgAmtItem(dfCust,dept)
+            S,D = getTotalAmts(dfCust,dept)
             alpha = [N,S,D]
             alpha = [0 if math.isnan(x) else x for x in alpha]
             alpha1 = preprocessing.normalize(np.array(alpha).reshape(1,-1))
@@ -272,10 +247,7 @@ def getTableRating(ilinks,dataframe,cols,UserTheta):
             fts = []
             for dept in depts:
                 N = getTotalFreq(dfCust,dept)
-                n = getAvgFreqOrder(dfCust,dept)
-                O,Q,G,S,D = getTotalAmts(dfCust,dept)
-                o,q,g,s,d = getAvgAmtsOrder(dfCust,dept)
-                oi,qi,gi,si,di = getAvgAmtItem(dfCust,dept)
+                S,D = getTotalAmts(dfCust,dept)
                 alpha = [N,S,D]
                 alpha = [0 if math.isnan(x) else x for x in alpha]
                 alpha1 = preprocessing.normalize(np.array(alpha).reshape(1,-1))
@@ -284,6 +256,7 @@ def getTableRating(ilinks,dataframe,cols,UserTheta):
                 fts.append(alpha+[propensity])
         else:
             pass
+        #print fts
         row = [i for sub in fts for i in sub]
         row.insert(0,ilink)
         temp = pd.DataFrame([tuple(row)],columns=cols)
@@ -303,10 +276,7 @@ def getTableRatingV2(ilinks,dataframe,cols):
             fts = []
             for dept in depts:
                 N = getTotalFreq(dfCust,dept)
-                n = getAvgFreqOrder(dfCust,dept)
-                O,Q,G,S,D = getTotalAmts(dfCust,dept)
-                o,q,g,s,d = getAvgAmtsOrder(dfCust,dept)
-                oi,qi,gi,si,di = getAvgAmtItem(dfCust,dept)
+                S,D = getTotalAmts(dfCust,dept)
                 alpha = [N,n,S,s,si,D,d,di]
                 alpha = [0 if math.isnan(x) else x for x in alpha]
                 alpha1 = preprocessing.normalize(np.array(alpha).reshape(1,-1))
@@ -320,11 +290,11 @@ def getTableRatingV2(ilinks,dataframe,cols):
         temp = pd.DataFrame([tuple(row)],columns=cols)
         tab = pd.concat([tab,temp])
     return tab
-                     
+
 #This function will get the customers highest Rating pref
 #It checks the rating first
 #if ratings are equal it checks for freq, total sold/sales as tiebreakers in that order
-#if that is not a tie-breaker it will return as many dept as "preferred" and consider that user as 
+#if that is not a tie-breaker it will return as many dept as "preferred" and consider that user as
 #having multiple preferences
 def getHigherPref(row):
     ws = (row.R_ws,row.N_ws,row.S_ws)
@@ -341,7 +311,7 @@ def getHigherPref(row):
             maxKey.append(key)
         elif value[0] == maxNum and value[0] != 0:
             maxKey.append(key)
-    
+
     #if no purchases were made
     if len(maxKey) == 0:
         return 0

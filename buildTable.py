@@ -26,7 +26,7 @@ query = """
 select * from jjill.jjill_master_data
 where is_emailable_ind='Y' and
 department_name in ('Woven Shirts','Knit Tops','Pants','Dresses') and
-order_date between '2017-01-01' and '2017-05-01'
+order_date between '2017-01-01' and '2017-12-31'
 limit 1000000;
 """
 df1 = dbu.get_df_from_query(query)
@@ -37,7 +37,7 @@ df.columns = map(str.upper, df.columns)
 print 'Number of unique customers:', len(df1.ILINK.unique().tolist())
 ilinks = df1.ILINK.unique().tolist()
 
-customers=ilinks
+customers=ilinks[:5000]
 
 print 'Getting Thetas'
 #Theta Value based on start-end timeframe
@@ -47,12 +47,11 @@ DFEXCUST = df.loc[df.ILINK.isin(customers)]
 DFEXCUST.reset_index(drop=True,inplace=True)
 
 #get indiv month datasets
-aprildf = f.getDF(DFEXCUST,'2017-4-1','2017-5-1')
-maydf = f.getDF(DFEXCUST,'2017-5-1','2017-6-1')
-junedf = f.getDF(DFEXCUST,'2017-6-1','2017-7-1')
-julydf = f.getDF(DFEXCUST,'2017-7-1','2017-8-1')
-augdf = f.getDF(DFEXCUST,'2017-8-1','2017-9-1')
-#septdf = f.getDF(DFEXCUST,'2017-9-1','2017-10-1')
+df = [None] * 5
+df[0] = f.getDF(DFEXCUST,'2018-1-1','2018-2-1')
+df[1] = f.getDF(DFEXCUST,'2018-2-1','2018-3-1')
+df[2] = f.getDF(DFEXCUST,'2018-3-1','2018-4-1')
+df[3] = f.getDF(DFEXCUST,'2018-4-1','2018-5-1')
 
 def checkBuy(N):
     if N > 0:
@@ -73,82 +72,22 @@ cols = ['Ilink','month','year',
 print 'Building Tables'
 table = pd.DataFrame([],columns=cols)
 for ilink in customers:
-    try:
-        temp = f.getTableRating([ilink],aprildf,columns,UserTheta)
-	Nws = f.getTotalFreq(maydf[maydf.ILINK==ilink],'Woven Shirts')
-	Nkt = f.getTotalFreq(maydf[maydf.ILINK==ilink],'Knit Tops')
-	Nd = f.getTotalFreq(maydf[maydf.ILINK==ilink],'Dresses')
-	Np = f.getTotalFreq(maydf[maydf.ILINK==ilink],'Pants')
-        temp.insert(1,'month',value=5)
-        temp.insert(2,'year',value=2017)
+    for i in range(0,4):
+        temp = f.getTableRating([ilink],df[i],columns,UserTheta)
+        Nws = f.getTotalFreq(df[i].ILINK==ilink],'Woven Shirts')
+	    Nkt = f.getTotalFreq(df[i].ILINK==ilink],'Knit Tops')
+        Nd = f.getTotalFreq(df[i].ILINK==ilink],'Dresses')
+        Np = f.getTotalFreq(df[i].ILINK==ilink],'Pants')
+        temp.insert(1,'month',value=i+1)
+        temp.insert(2,'year',value=2018)
         temp.insert(7,'B_ws',value=checkBuy(Nws))
         temp.insert(12,'B_kt',value=checkBuy(Nkt))
         temp.insert(17,'B_d',value=checkBuy(Nd))
         temp.insert(22,'B_p',value=checkBuy(Np))
         table = pd.concat([table,temp])
-    except:
-        pass
 
-    try:
-        temp = f.getTableRating([ilink],maydf,columns,UserTheta)
-        Nws = f.getTotalFreq(junedf[junedf.ILINK==ilink],'Woven Shirts')
-        Nkt = f.getTotalFreq(junedf[junedf.ILINK==ilink],'Knit Tops')
-        Nd = f.getTotalFreq(junedf[junedf.ILINK==ilink],'Dresses')
-        Np = f.getTotalFreq(junedf[junedf.ILINK==ilink],'Pants')
-        temp.insert(1,'month',value=6)
-        temp.insert(2,'year',value=2017)
-        temp.insert(7,'B_ws',value=checkBuy(Nws))
-        temp.insert(12,'B_kt',value=checkBuy(Nkt))
-        temp.insert(17,'B_d',value=checkBuy(Nd))
-        temp.insert(22,'B_p',value=checkBuy(Np))
-        table = pd.concat([table,temp])
-    except:
-        pass
-    try:
-        temp = f.getTableRating([ilink],junedf,columns,UserTheta)
-	Nws = f.getTotalFreq(julydf[julydf.ILINK==ilink],'Woven Shirts')
-        Nkt = f.getTotalFreq(julydf[julydf.ILINK==ilink],'Knit Tops')
-        Nd = f.getTotalFreq(julydf[julydf.ILINK==ilink],'Dresses')
-        Np = f.getTotalFreq(julydf[julydf.ILINK==ilink],'Pants')
-        temp.insert(1,'month',value=7)
-        temp.insert(2,'year',value=2017)
-        temp.insert(7,'B_ws',value=checkBuy(Nws))
-        temp.insert(12,'B_kt',value=checkBuy(Nkt))
-        temp.insert(17,'B_d',value=checkBuy(Nd))
-        temp.insert(22,'B_p',value=checkBuy(Np))
-        table = pd.concat([table,temp])
-    except:
-        pass
-
-    try:
-        temp = f.getTableRating([ilink],julydf,columns,UserTheta)
-        Nws = f.getTotalFreq(augdf[augdf.ILINK==ilink],'Woven Shirts')
-        Nkt = f.getTotalFreq(augdf[augdf.ILINK==ilink],'Knit Tops')
-        Nd = f.getTotalFreq(augdf[augdf.ILINK==ilink],'Dresses')
-        Np = f.getTotalFreq(augdf[augdf.ILINK==ilink],'Pants')
-        temp.insert(1,'month',value=8)
-        temp.insert(2,'year',value=2017)
-        temp.insert(7,'B_ws',value=checkBuy(Nws))
-        temp.insert(12,'B_kt',value=checkBuy(Nkt))
-        temp.insert(17,'B_d',value=checkBuy(Nd))
-        temp.insert(22,'B_p',value=checkBuy(Np))
-        table = pd.concat([table,temp])
-    except:
-        pass
-
-#    try:
-#        temp = f.getTableRating([ilink],augdf,columns,UserTheta)
-#        temp.insert(1,'month',value=9)
-#        temp.insert(2,'year',value=2017)
-#        temp.insert(7,'B_ws',value=checkBuy(temp.N_ws.values[0]))
-#        temp.insert(12,'B_kt',value=checkBuy(temp.N_kt.values[0]))
-#        temp.insert(17,'B_d',value=checkBuy(temp.N_d.values[0]))
-#        temp.insert(22,'B_p',value=checkBuy(temp.N_p.values[0]))
-#        table = pd.concat([table,temp])
-#    except:
-#        pass
 
 table = table[(table[cols[3:]].T != 0).any()]
 
 print 'Saving Table/Data'
-table.to_pickle('./dataset_AllCustomers.pkl')
+table.to_pickle('./dataset_5000Customers2017.pkl')
