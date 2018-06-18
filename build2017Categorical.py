@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import math
 from datetime import datetime as dt, timedelta
-import functions as f
+import functionsV2 as f
 
 #modules for specific application
 import random
