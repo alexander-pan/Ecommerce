@@ -14,7 +14,7 @@ sys.path.append('./utils')
 from db_utils import DBUtil
 
 #connect to aws
-dbu = DBUtil("jjill_redshift","/home/jjill/.databases.conf")
+dbu = DBUtil("komodo_redshift","/home/jjill/.databases.conf")
 print 'get first query'
 query = """
 select ilink,department_name, count(*) as Total_Bought,
@@ -29,3 +29,4 @@ and order_date between '2017-01-01' and '2017-12-31'
 group by ilink,department_name order by ilink;
 """
 df = dbu.get_df_from_query(query)
+df.to_pickle("./data/numeric_fts_2017.pkl")
