@@ -14,14 +14,8 @@ import random
 import dill
 import ModelEvaluation as me
 
-DF = pd.read_pickle('../data/Pants_dataset_months.pkl')
+DF = pd.read_pickle('../data/CustomerTime_May2017_Apri2018_Dataset.pkl')
 print 'Total Size of Dataset: ', DF.shape[0]
-
-#print 'Filling Null results with means'
-#DF.fillna(DF.mean(),inplace=True)
-print 'Dropping NaN results'
-DF.dropna(axis=0,how='any',inplace=True)
-print 'New Size:', DF.shape[0]
 
 print 'Getting Fts Columns'
 cols = DF.columns
