@@ -1,10 +1,16 @@
 import numpy as np
 import pandas as pd
 
+
+
 DF1 = pd.read_pickle('../data/numericFts_may2017_apr2018.pkl')
-DF2 = pd.read_pickle('../data/categorical_fts_may2017_apr2018.pkl')
+DF2a = pd.read_pickle('../data/categorical_fts_may2017_nov2017.pkl')
+DF2b = pd.read_pickle('../data/categorical_fts_dec2017_apr2018.pkl')
+DF2 = pd.concat([DF2a,DF2b])
 DF1.columns = map(str.upper, DF1.columns)
 DF2.columns = map(str.upper, DF2.columns)
+DF2 = DF2.sort_values(['ILINK','MONTH','YEAR'])
+DF2.reset_index(drop=True,inplace=True)
 
 DF = DF1.merge(DF2,on=['ILINK','DEPARTMENT_NAME','MONTH','YEAR'],how='outer')
 DF['BOUGHT_PANTS'] = [1 if x.DEPARTMENT_NAME == 'Pants' else 0 for i,x in DF.iterrows()]

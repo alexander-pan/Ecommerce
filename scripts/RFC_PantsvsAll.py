@@ -15,6 +15,8 @@ import dill
 import ModelEvaluation as me
 
 DF = pd.read_pickle('../data/CustomerTime_May2017_Apri2018_Dataset.pkl')
+#DF = pd.read_pickle('../data/PantsCust_May2017_Apr2018_clusteredV1.pkl')
+
 print 'Total Size of Dataset: ', DF.shape[0]
 
 print 'Getting Fts Columns'
