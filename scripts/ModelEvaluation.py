@@ -9,9 +9,7 @@ from sklearn.model_selection import train_test_split,GridSearchCV,ShuffleSplit
 from sklearn.preprocessing import OneHotEncoder,LabelEncoder,StandardScaler, Normalizer
 from sklearn.metrics import confusion_matrix, roc_curve, auc
 
-def ModelEvalClassifier(grid,X_train,X_test,y_train,y_test):
-    #X_train,X_test,y_train,y_test = train_test_split(X,y,test_size=.2,random_state=42)
-
+def ModelEvalClassifier(grid,X_test,y_test):
     #Using Confusion matrix to test accuracy
     i = grid.best_index_
     test_mean = grid.cv_results_['mean_test_score'][i] * 100
