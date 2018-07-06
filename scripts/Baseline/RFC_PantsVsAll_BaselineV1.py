@@ -39,8 +39,8 @@ print 'Dependent feature: %s\n\n' % dependent
 
 #getting 80% of customers for training and 20% customers left for testing
 print 'Building Train and Test...'
-train = DF.ILINK.unique().tolist()[:11953]
-test = DF.ILINK.unique().tolist()[11953:]
+train = DF.ILINK.unique().tolist()[:7974]
+test = DF.ILINK.unique().tolist()[7974:]
 DFTrain = DF[DF.ILINK.isin(train)]
 DFTest = DF[DF.ILINK.isin(test)]
 
@@ -75,7 +75,7 @@ print 'Best estimator score:',grid.best_score_
 print 'Best estimator params:',grid.best_params_
 print ''
 
-name = 'BaselineV1_15k'
+name = 'BaselineV1_10k'
 dill.settings['recurse']=True
 with open('../models/RFC_PantsVsAll_%s.pkl' % name,'wb') as outfile:
     dill.dump(grid,outfile)
