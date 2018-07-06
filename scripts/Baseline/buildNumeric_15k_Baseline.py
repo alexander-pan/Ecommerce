@@ -59,19 +59,7 @@ reference_data as (
 
 select
   t3.ilink, date_part(mon,t3.ref_date) as ref_date_month, date_part(day,t3.ref_date) as ref_date_day,
-  date_part(yr,t3.ref_date) as ref_date_year, t3.department_name,
-  max(t3.most_recent_past_order_date) as most_recent_past_order_date,
-  max(t3.num_past_orders) as num_past_orders,
-  max(t3.sum_past_shipped_sold_amt) as sum_past_shipped_sold_amt,
-  max(t3.avg_past_shipped_sold_amt) as avg_past_shipped_sold_amt,
-  max(t3.stddev_past_shipped_sold_amt) as stddev_past_shipped_sold_amt,
-  max(t3.var_past_shipped_sold_amt) as var_past_shipped_sold_amt,
-  max(t3.sum_past_discount) as sum_past_discount,
-  max(t3.avg_past_discount) as avg_past_discount,
-  max(t3.stddev_past_discount) as stddev_past_discount,
-  max(t3.var_past_discount) as var_past_discount
-  --max(case when t4.order_date is null then 0 else 1 end) as future_order,
-  --min(t4.order_date) as min_future_order_date
+  date_part(yr,t3.ref_date) as ref_date_year, t3.department_name
 from
 (
   select
@@ -81,17 +69,7 @@ from
            when t1.department_name not in('Woven Shirts','Dresses','Knit Tops','Pants') then 'Other_Dept'
            else t1.department_name
       end
-    ),
-    max(t2.order_date) as most_recent_past_order_date,
-    count(t2.order_date) as num_past_orders,
-    sum(case when t2.shipped_sold_amt = '' then 0.0 else t2.shipped_sold_amt::float end) as sum_past_shipped_sold_amt,
-    avg(case when t2.shipped_sold_amt = '' then 0.0 else t2.shipped_sold_amt::float end) as avg_past_shipped_sold_amt,
-    stddev_samp(case when t2.shipped_sold_amt = '' then 0.0 else t2.shipped_sold_amt::float end) as stddev_past_shipped_sold_amt,
-    var_samp(case when t2.shipped_sold_amt = '' then 0.0 else t2.shipped_sold_amt::float end) as var_past_shipped_sold_amt,
-    sum(case when t2.discount = '' then 0.0 else t2.discount::float end) as sum_past_discount,
-    avg(case when t2.discount = '' then 0.0 else t2.discount::float end) as avg_past_discount,
-    stddev_samp(case when t2.discount = '' then 0.0 else t2.discount::float end) as stddev_past_discount,
-    var_samp(case when t2.discount = '' then 0.0 else t2.discount::float end) as var_past_discount
+    )
   from reference_data as t1
   join jjill.jjill_keyed_data as t2 on (
                                     t1.ilink = t2.ilink
