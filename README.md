@@ -13,8 +13,6 @@
 - Have some clustering analysis notebooks as well
 
 # Models
-- In progress
-- Will include models that are built
-- Also include any notebooks showing model evaluation results
+- Includes any notebooks showing model evaluation results
 
 
