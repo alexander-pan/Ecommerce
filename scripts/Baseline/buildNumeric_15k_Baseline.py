@@ -102,7 +102,7 @@ from
                                                                 end
                                                               )
                                     and t1.ref_date > t2.order_date
-                                    and t1.ref_date::date - 30 < t2.order_date
+                                    and t1.ref_date::date + 30 > t2.order_date
                                   )
   where t2.order_date between '2018-01-01' and '2018-06-01'
   group by t1.ilink, t1.ref_date,

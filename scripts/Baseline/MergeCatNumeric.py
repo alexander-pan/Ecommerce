@@ -19,4 +19,4 @@ print 'Current size: ', DF.shape[0]
 #print 'New Size:', DF.shape[0]
 
 print 'Saving new DataFrame'
-DF.to_pickle('../data/Customer_Dataset_15k_Baseline.pkl')
+DF.to_pickle('../data/Customer_Dataset_10k_Baseline.pkl')
