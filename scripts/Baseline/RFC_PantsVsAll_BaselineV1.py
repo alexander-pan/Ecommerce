@@ -14,8 +14,8 @@ import dill
 #import ModelEvaluation as me
 
 #DF = pd.read_pickle('../data/numericalFts_10kUsers_BaselineV1.pkl')
-DF = pd.read_pickle('../data/Customer_Dataset_15k_Baseline.pkl')
-#DF = pd.read_pickle('../data/trial.pkl')
+DF = pd.read_pickle('../../data/Baseline/Customer_Dataset_15k_Baseline.pkl')
+
 print 'Total Size of Dataset: %d' % DF.shape[0]
 print 'Total Unique Users: %d\n\n' % len(DF.ILINK.unique().tolist())
 
@@ -39,8 +39,9 @@ print 'Dependent feature: %s\n\n' % dependent
 
 #getting 80% of customers for training and 20% customers left for testing
 print 'Building Train and Test...'
-train = DF.ILINK.unique().tolist()[:7974]
-test = DF.ILINK.unique().tolist()[7974:]
+limit_num = int(round(DF.ILINK.unique().shape[0] *.8))
+train = DF.ILINK.unique().tolist()[:limit_num]
+test = DF.ILINK.unique().tolist()[limit_num:]
 DFTrain = DF[DF.ILINK.isin(train)]
 DFTest = DF[DF.ILINK.isin(test)]
 
@@ -63,6 +64,7 @@ pipe = Pipeline([('rfc',RandomForestClassifier(n_estimators=100,
                                                max_features='auto',
                                                class_weight='balanced'))])
 
+#params = [{'rfc__max_depth': [1,2,3,4,5,6,7,8,9,None]}]
 params = [{'rfc__max_depth': [None]}]
 grid = GridSearchCV(estimator=pipe,
                     param_grid=params,
@@ -75,9 +77,9 @@ print 'Best estimator score:',grid.best_score_
 print 'Best estimator params:',grid.best_params_
 print ''
 
-name = 'BaselineV1_10k'
+name = 'BaselineV1_15k'
 dill.settings['recurse']=True
-with open('../models/RFC_PantsVsAll_%s.pkl' % name,'wb') as outfile:
+with open('../../models/Baseline/RFC_PantsVsAll_%s.pkl' % name,'wb') as outfile:
     dill.dump(grid,outfile)
 
 pred = grid.predict(X_test)

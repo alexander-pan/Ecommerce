@@ -1,8 +1,5 @@
 import numpy as np
 import pandas as pd
-import math
-from datetime import datetime as dt, timedelta
-import functionsV2 as f
 
 #modules for specific application
 import random
@@ -10,12 +7,12 @@ import dill
 
 #accessing aws data
 import sys
-sys.path.append('../utils')
+sys.path.append('../../utils')
 from db_utils import DBUtil
 
 #connect to aws
-#dbu = DBUtil("jjill_redshift","/home/jjill/.databases.conf")
-dbu = DBUtil("jjill_redshift","../../databases/database.conf")
+dbu = DBUtil("jjill_redshift","/home/jjill/.databases.conf")
+#dbu = DBUtil("jjill_redshift","../../databases/database.conf")
 
 #Queries reflec the features you choose, so make sure to change query based on
 #this
@@ -268,4 +265,4 @@ df = df[features]
 df.columns = [str.upper(x.replace(' ','_')) for x in df.columns]
 
 print "Saving DataFrame"
-df.to_pickle('../data/categoricalFts_15kUsers_BaselineV1.pkl')
+df.to_pickle('../../data/Baseline/categoricalFts_15kUsers_BaselineV1.pkl')

@@ -2,12 +2,12 @@ import pandas as pd
 
 #accessing aws data
 import sys
-sys.path.append('../utils')
+sys.path.append('../../utils')
 from db_utils import DBUtil
 
 #connect to aws
-#dbu = DBUtil("jjill_redshift","/home/jjill/.databases.conf")
-dbu = DBUtil("jjill_redshift","../../databases/database.conf")
+dbu = DBUtil("jjill_redshift","/home/jjill/.databases.conf")
+#dbu = DBUtil("jjill_redshift","../../databases/database.conf")
 
 print 'get first query'
 query = """
@@ -227,4 +227,5 @@ df_new = df.merge(df_new,on=['ilink','ref_date_month','ref_date_day','ref_date_y
 df_new.columns = map(str.upper,df_new.columns)
 df_new.fillna(df_new.mean(),inplace=True)
 #df_new.dropna(inplace=True)
-df_new.to_pickle('../data/numericalFts_15kUsers_BaselineV1.pkl')
+#df_new.to_pickle('../data/numericalFts_15kUsers_BaselineV1.pkl')
+df_new.to_pickle('../../data/Baseline/numericalFts_15kUsers_BaselineV1.pkl')
