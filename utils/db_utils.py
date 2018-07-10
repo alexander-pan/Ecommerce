@@ -34,21 +34,34 @@ class DBUtil():
             conn = self.conn_pool.getconn()   
         return conn 
     
-    def get_df_from_query(self, query, params=None): 
-        try: 
-            conn = self.conn_pool.getconn() 
-        except: 
+    def get_df_from_query(self, query, params=None, pprint=False, to_df=True, server_cur=False, itersize=20000):
+        try:
+            conn = self.conn_pool.getconn()
+        except:
             self.connect_to_db()
-            conn = self.conn_pool.getconn() 
-            
-        with conn.cursor() as cur: 
-            cur.execute(query, params)
+            conn = self.conn_pool.getconn()
+        
+        if pprint==True:
+            print(self.format_sql(query))
 
-            data = cur.fetchall()
-            columns = [desc[0] for desc in cur.description]
+        if server_cur == True:
+            cur = conn.cursor('server_side_cursor')
+            cur.itersize = itersize
+            cur.execute(query, params)            
+            return cur
+        else:
+            with conn.cursor() as cur:
+                cur.execute(query, params)
+                data = cur.fetchall()
+                columns = [desc[0] for desc in cur.description]
+            
         self.conn_pool.putconn(conn)
-        df = pd.DataFrame(data, columns=columns)
-        return df 
+        
+        if to_df == True: 
+            df = pd.DataFrame(data, columns=columns)
+            return df
+        else:
+            return data, columns 
     
     def get_arr_from_query(self, query, params=None): 
         results_arr = [] 
