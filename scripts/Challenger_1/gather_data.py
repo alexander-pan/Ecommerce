@@ -114,7 +114,7 @@ def define_department_level_vars(numerical_vars):
     for x in department_categorical_vars:
         for y in department_categorical_vars[x]:
             val = "sum(CASE WHEN " + x + " IN ('" + y + "') THEN 1.0 ELSE 0.0 END) / count(ilink)::float"
-            department_vars['department_' + x + '_' + y.split(' ')[0].split('/')[0].lower() + '_pct'] = val
+            department_vars['department_' + x + '__' + y.split(' ')[0].split('/')[0].lower() + '_pct'] = val
     return department_vars
 
 # Defining Any Other Variables Not Fitting In The Above Categories
@@ -161,36 +161,88 @@ def combine_vars(numerical_vars_fields, categorical_vars_fields, other_binary_va
         output_vars[x] = other_vars[x]
     return output_vars
 
-# Running SQL To Gather Training / Prediction Data
-def run_data_query(output_vars, department_vars, params, dbu):
-    min_reference_date = str(datetime.strptime(params['min_date'], '%Y-%m-%d') + timedelta(days=int(params['lookback_window']))).split(' ')[0]
-    sql = """
+# Adjusting Data For Query
+def adjust_dates(dbu, params):
+    df = dbu.get_df_from_query("""
+        SELECT min(order_date) AS min_date, max(order_date) AS max_date
+        FROM jjill.jjill_keyed_data
+        WHERE order_date::date >= '""" + params['min_date'] + """'
+        AND order_date::date <= '""" + params['max_date'] + """'
+    """)
+    for i, row in df.iterrows(): date_extremas = { x:str(dict(row)[x]) for x in dict(row) }
+    dates = {}
+    dates['min_reference_date'] = str(datetime.strptime(date_extremas['min_date'], '%Y-%m-%d') + timedelta(days=int(params['lookback_window']))).split(' ')[0]
+    dates['max_reference_date'] = str(datetime.strptime(date_extremas['max_date'], '%Y-%m-%d') - timedelta(days=int(params['lookfront_window']))).split(' ')[0]
+    max_possible_min_data_date = str(datetime.strptime(dates['max_reference_date'], '%Y-%m-%d') - timedelta(days=int(params['lookback_window']))).split(' ')[0]
+    dates['min_data_date'] = date_extremas['min_date'] if date_extremas['min_date'] < max_possible_min_data_date else max_possible_min_data_date
+    dates['max_data_date'] = date_extremas['max_date']
+    if params['mode'] == 'eval':
+        dates['min_data_date'] = max_possible_min_data_date
+        dates['min_reference_date'] = dates['max_reference_date']
+    pprint(dates)
+    if dates['max_reference_date'] < dates['min_reference_date']: 
+        print('invalid date range'); sys.exit()
+    return dates
+
+# Adding Data Types To Fields
+def adding_field_data_types(dbu, columns):
+    df = dbu.get_df_from_query("""
+        SET search_path TO 'jjill';
+        SELECT *
+        FROM pg_table_def
+        WHERE tablename = 'jjill_keyed_data'
+    """)
+    table_cols = {}
+    for i, row in df.iterrows(): table_cols[row['column']] = row['type']
+    column_types = {'ref_date':'date'}
+    for col in columns:
+        field = col.replace('department_avg_', '')
+        if field in table_cols: column_types[col] = table_cols[field]
+        if col[-4:] == '_pct': column_types[col] = 'double precision'
+    return column_types
+
+# Create Temporary Reference Table
+def create_reference_table(dbu, dates, department_vars, params):
+    print('\nrunning reference data queries...')
+    user_limit = params['num_users'] if params['mode'] == 'train' else str(1000000)
+    columns = ['ilink', 'department_name', 'ref_date'] + sorted([ x for x in department_vars ])
+    column_types = adding_field_data_types(dbu, columns)
+    dbu.update_db("""
+        DROP TABLE IF EXISTS jjill.jjill_reference_data;
+        CREATE TABLE jjill.jjill_reference_data
+         (
+             """ + ',\n\t\t'.join([ columns[i] + ' ' + column_types[columns[i]] for i in range(0,len(columns)) ]) + """
+         ) distkey(ilink) sortkey(ref_date)
+    """)
+    dbu.update_db("""
+        INSERT INTO jjill.jjill_reference_data (""" + ', '.join(columns) + """)
+
         WITH all_users AS (
             SELECT ilink
             FROM jjill.jjill_keyed_data
             WHERE department_name in ('Knit Tops','Woven Shirts','Dresses','Pants')
             AND is_emailable_ind='Y'
-            AND order_date::date > '""" + params['min_date'] + """'
-            AND order_date::date < '""" + params['max_date'] + """'
+            AND order_date::date >= '""" + dates['min_data_date'] + """'
+            AND order_date::date <= '""" + dates['max_reference_date'] + """'
             GROUP BY ilink
             ORDER BY ilink
-            LIMIT """ + params['num_users'] + """
+            LIMIT """ + user_limit + """
         ),
 
         all_departments AS (
             SELECT
                 (CASE WHEN department_name NOT IN """ + params['valid_departments'] + """ THEN 'Other_Dept' ELSE department_name END)
             FROM jjill.jjill_keyed_data
-            WHERE order_date::date > '""" + params['min_date'] + """'
-            AND order_date::date < '""" + params['max_date'] + """'
+            WHERE order_date::date >= '""" + dates['min_data_date'] + """'
+            AND order_date::date <= '""" + dates['max_reference_date'] + """'
             GROUP BY 1
         ),
 
         all_dates AS (
             SELECT order_date AS ref_date
             FROM jjill.jjill_keyed_data
-            WHERE order_date::date > '""" + min_reference_date + """'
-            AND order_date::date < '""" + params['max_date'] + """'
+            WHERE order_date::date >= '""" + dates['min_reference_date'] + """'
+            AND order_date::date <= '""" + dates['max_reference_date'] + """'
             GROUP BY order_date
         ),
 
@@ -200,8 +252,8 @@ def run_data_query(output_vars, department_vars, params, dbu):
                 department_name,
                 """ + ',\n\t\t'.join(sorted([ department_vars[x] + ' AS ' + x for x in department_vars ])) + """
             FROM jjill.jjill_keyed_data
-            WHERE order_date::date > '""" + params['min_date'] + """'
-            AND order_date::date < '""" + params['max_date'] + """'
+            WHERE order_date::date >= '""" + dates['min_data_date'] + """'
+            AND order_date::date <= '""" + dates['max_reference_date'] + """'
             GROUP BY order_date::date, department_name
         ),
 
@@ -229,7 +281,30 @@ def run_data_query(output_vars, department_vars, params, dbu):
             WHERE tc.date_rank = 1
         )
 
-        --- main query ---
+        SELECT """ + ', '.join(columns) + """
+        FROM reference_data
+        
+    """)
+    return
+
+# Get Data Columns From SQL
+def columns_from_sql(sql):
+    columns = sql.split('SELECT')[1].split('FROM')[0].split(',')
+    columns = [ columns[i].strip().lower().replace('t3.','') for i in range(0,len(columns)) ]
+    columns = [ columns[i].split(' as ')[-1] for i in range(0,len(columns)) ]
+    return columns
+
+# Running SQL To Gather Training / Prediction Data
+def run_data_query(output_vars, department_vars, params, dbu):
+
+    # Adjusting Data For Query
+    dates = adjust_dates(dbu, params)
+
+    # Create Temporary Reference Table
+    create_reference_table(dbu, dates, department_vars, params)
+
+    # Main Query
+    sql = """
         SELECT
             t3.ilink, t3.ref_date, t3.department_name,
             max(CASE WHEN t4.order_date IS NULL THEN 0 ELSE 1 END) AS outcome,
@@ -241,31 +316,35 @@ def run_data_query(output_vars, department_vars, params, dbu):
                 t1.ilink, t1.ref_date::date as ref_date, t1.department_name,
                 """ + ',\n\t\t'.join(sorted([ 'max(t1.' + x + ') AS ' + x for x in department_vars ])) + """,
                 """ + ',\n\t\t'.join([ output_vars[x]['definition'] + ' AS ' + x for x in output_vars ]) + """
-            FROM reference_data AS t1
+            FROM jjill.jjill_reference_data AS t1
             LEFT JOIN jjill.jjill_keyed_data AS t2 ON (
                 t1.ilink = t2.ilink 
                 AND t1.ref_date > t2.order_date
                 AND t1.ref_date::date - """ + params['lookback_window'] + """ < t2.order_date
             )
-            WHERE ((t2.order_date BETWEEN '""" + params['min_date'] + """' AND '""" + params['max_date'] + """') OR (t2.order_date IS NULL))
+            WHERE (
+                (t2.order_date >= '""" + dates['min_data_date'] + """' AND t2.order_date < '""" + dates['max_reference_date'] + """') 
+                OR (t2.order_date IS NULL)
+            )
             GROUP BY t1.ilink, t1.ref_date::date, t1.department_name
         ) AS t3
         LEFT JOIN jjill.jjill_keyed_data AS t4 ON (
             t3.ilink = t4.ilink 
             AND t3.department_name = t4.department_name
             AND t3.ref_date <= t4.order_date
-            AND t3.ref_date + 30 > t4.order_date
+            AND t3.ref_date + """ + str(params['lookfront_window']) + """ > t4.order_date
         )
-        WHERE ((t4.order_date BETWEEN '""" + params['min_date'] + """' AND '""" + params['max_date'] + """') OR (t4.order_date is null))
+        WHERE (
+            (t4.order_date >= '""" + dates['min_reference_date'] + """' AND t4.order_date <= '""" + dates['max_data_date'] + """') 
+            OR (t4.order_date is null)
+        )
         GROUP BY t3.ilink, t3.ref_date, t3.department_name
         ORDER BY random()
     """
 
-    print('running queries...'); #print(sql)
+    print('running data query'); print('\n' + sql) #; sys.exit()
     queried_data = dbu.get_df_from_query(sql, server_cur=True, itersize=1000)
-    columns = sql.split('- main query -')[1].split('SELECT')[1].split('FROM')[0].split(',')
-    columns = [ columns[i].strip().lower().replace('t3.','') for i in range(0,len(columns)) ]
-    columns = [ columns[i].split(' as ')[-1] for i in range(0,len(columns)) ]
+    columns = columns_from_sql(sql)
     return queried_data, columns
 
 # Creating Variables Based On All Distinct Order Dates
@@ -285,8 +364,8 @@ def distinct_order_date_based_variables(row, output_vars):
     return row
 
 # Outputting Training / Prediction Data To A File
-def save_data(queried_data, columns, output_vars):
-    f = open('train_data.txt','w')
+def save_data(queried_data, columns, output_vars, params):
+    f = open(params['mode'] + '_data.txt','w')
     class_sizes = {0:0, 1:0}; c = 0; n_estimate = 20000
     for item in queried_data:
         row = dict(zip(columns, item))
@@ -301,9 +380,10 @@ def save_data(queried_data, columns, output_vars):
             balance_ratio = min(class_sizes.values()) / float(max(class_sizes.values()))
             print('\tmajority_class: ' + str(majority_class))
             print('\tbalance_ratio: ' + str(balance_ratio))
-        if c > n_estimate:
-            if row['outcome'] == majority_class:
-                if random() > balance_ratio: continue 
+        if params['mode'] == 'train':
+            if c > n_estimate:
+                if row['outcome'] == majority_class:
+                    if random() > balance_ratio: continue 
         for x in row: row[x] = output_vars[x]['default_value'] if row[x] == None else row[x]
         row['ref_date'] = str(row['ref_date'])
         f.write(str(row).replace("'", '"') + '\n')
@@ -315,14 +395,21 @@ def save_data(queried_data, columns, output_vars):
 ##  MAIN  ##
 ############
 
+print('\nstart time: ' + str(datetime.now()))
+arg_options = ['train', 'eval']
+error_msg = 'script requires 1 argument: {' + '|'.join(arg_options) + '}'
+if len(sys.argv) != 2: print(error_msg); sys.exit()
+if sys.argv[1] not in arg_options: print(error_msg); sys.exit()
+
 params = {
     'num_users': '3000',
-    'min_date': '2018-01-01',
-    'max_date': '2018-06-01',
+    'min_date': '2017-10-01',
+    'max_date': '2018-02-10', #'2018-02-10' for train; '2018-04-17' for eval
     'valid_departments': "('Knit Tops','Woven Shirts','Dresses','Pants')",
-    'lookback_window': '90' #30
+    'lookback_window': '60',
+    'lookfront_window': '30',
+    'mode': sys.argv[1]
 }
-print('\nstart time: ' + str(datetime.now()))
 dbu = DBUtil("jjill_redshift","C:\Users\Terry\Desktop\KT_GitHub\databases\databases.conf")
 
 numerical_vars, numerical_vars_fields = define_continuous_ref_level_vars(params)
@@ -333,6 +420,6 @@ other_vars = define_other_vars(params)
 output_vars = combine_vars(numerical_vars_fields, categorical_vars_fields, other_binary_vars_fields, other_vars)
 
 queried_data, columns = run_data_query(output_vars, department_vars, params, dbu)
-save_data(queried_data, columns, output_vars)
+save_data(queried_data, columns, output_vars, params)
 
 print('end time: ' + str(datetime.now()) + '\n')
