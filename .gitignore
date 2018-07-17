@@ -108,5 +108,9 @@ venv.bak/
 
 # datafiles
 train_data.txt
+eval_data.txt
+model.p
+
+
 
 
