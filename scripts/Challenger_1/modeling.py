@@ -131,7 +131,7 @@ def isolate_top_predictions(predictions, top_preds_batch, prediction_meta, top_n
 def evaluate_predictions(top_preds_batch, prediction_meta):
     total_number_samples_scored = prediction_meta['total_class_0'] + prediction_meta['total_class_1']
     random_accuracy = float(prediction_meta['total_class_1']) / float(total_number_samples_scored)
-    min_threshold = 1000; num_points = 50
+    min_threshold = 0; num_points = 50
     increment = int((len(top_preds_batch) - min_threshold) / float(num_points))
     xs = []; ys = []
     for i in range(0,num_points+1):
@@ -139,7 +139,7 @@ def evaluate_predictions(top_preds_batch, prediction_meta):
         top_batch = top_preds_batch[0:index]
         num_correct_top_preds_batch = float(sum([ x['correct'] for x in top_batch ]))
         num_samples_top_preds_batch = float(len(top_batch))
-        accuracy_top_preds_batch = num_correct_top_preds_batch / num_samples_top_preds_batch
+        accuracy_top_preds_batch = num_correct_top_preds_batch / num_samples_top_preds_batch if num_samples_top_preds_batch > 0 else 0.0
         xs.append(index)
         ys.append(accuracy_top_preds_batch)
         if i == num_points:
@@ -147,13 +147,19 @@ def evaluate_predictions(top_preds_batch, prediction_meta):
             print('Sample size top_preds_batch: ' + str(num_samples_top_preds_batch))
             print('Accuracy top_preds_batch: ' + str(accuracy_top_preds_batch))
             print('Random class 1 accuracy: ' + str(random_accuracy))
+    pcts = [ '%.1f'%(100*(xs[i] / float(total_number_samples_scored))) + '%' for i in range(0,len(xs)) ]
     f, ax = plt.subplots(1)
-    plt.scatter(xs, ys)
-    plt.plot(xs, ys, '-')
+    plt.scatter(xs[1:], ys[1:])
+    plt.plot(xs[1:], ys[1:], '-')
     plt.plot([min(xs),max(xs)], [random_accuracy, random_accuracy], '-', c='r')
     ax.set_ylim(ymin=0)
-    plt.xlabel("Top scored set size")
+    x_text_inds = [ xs[i] for i in range(0,len(xs)) if i % 10 == 0 ]
+    x_text_vals = [ pcts[i] for i in range(0,len(pcts)) if i % 10 == 0 ]
+    plt.xticks(x_text_inds, x_text_inds)
+    for i in range(0,len(x_text_inds)): ax.text(x_text_inds[i], -0.079, x_text_vals[i], size=6, ha='center')
+    plt.xlabel("Top scored set size", labelpad=15)
     plt.ylabel('Class 1 accuracy')
+    f.subplots_adjust(bottom=0.22)
     plt.savefig('top_scored_accuracy.png')
     plt.show()
     return 
@@ -197,6 +203,9 @@ while True:
         df_x = sort_dataframe_columns(df_x)
         predictions = generate_predictions(clf, df_x, df_y)
         top_preds_batch = isolate_top_predictions(predictions, top_preds_batch, prediction_meta, top_n=50000)
+
+        #evaluate_predictions(top_preds_batch, prediction_meta)
+        #sys.exit()
 
     if (len(df) != batch_size) or (mode == 'train'): break
     else: print('processed rows: ' + str(c))
