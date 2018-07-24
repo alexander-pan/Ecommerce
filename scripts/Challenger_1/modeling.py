@@ -107,61 +107,88 @@ def load_classifier():
     return clf
 
 # Generating Predictions With Classifier
-def generate_predictions(clf, df_x, df_y):
-    predictions = []
+def generate_predictions(clf, df_x, df_y, df_context):
+    predictions = {}
     ys = df_y['outcome'].tolist()
+    cs = df_context['ilink'].tolist()
     pred_probs = clf.predict_proba(df_x)
     for i in range(0,len(pred_probs)):
         score = max(pred_probs[i])
         pred_class = list(pred_probs[i]).index(score)
         correct = 1 if int(ys[i]) == pred_class else 0
-        predictions.append({'score':score, 'correct':correct, 'true_class':int(ys[i]), 'pred_class':pred_class})
+        value = {'score':score, 'correct':correct, 'true_class':int(ys[i]), 'pred_class':pred_class}
+        ilink = cs[i]
+        if ilink in predictions:
+            if score > predictions[ilink]['score']:
+                predictions[ilink] = value
+        else:
+            predictions[ilink] = value
     return predictions
 
 # Isolate Top Predictions
-def isolate_top_predictions(predictions, top_preds_batch, prediction_meta, top_n=5000):
+def isolate_top_predictions(predictions, top_preds_batch, top_preds_1p_user_batch, prediction_meta, top_n=5000):
     for x in predictions:
-        prediction_meta['total_class_' + str(x['true_class'])] += 1
-        if x['pred_class'] == 1: top_preds_batch.append(x)
+        pred_dict = predictions[x]
+        prediction_meta['total_class_' + str(pred_dict['true_class'])] += 1
+        prediction_meta['users'][x] = 1
+        if pred_dict['pred_class'] == 1: 
+            top_preds_batch.append(pred_dict)
+            if x in top_preds_1p_user_batch:
+                if pred_dict['score'] > top_preds_1p_user_batch[x]['score']:
+                    top_preds_1p_user_batch[x] = pred_dict
+            else:
+                top_preds_1p_user_batch[x] = pred_dict
     top_preds_batch = sorted(top_preds_batch, key=lambda k: k['score'], reverse=True)
     top_preds_batch = top_preds_batch[0:top_n]
-    return top_preds_batch
+    top_preds_1p_user_batch = sorted(top_preds_1p_user_batch.items(), key=lambda x: x[1]['score'], reverse=True)
+    top_preds_1p_user_batch = top_preds_1p_user_batch[0:top_n]
+    top_preds_1p_user_batch = { top_preds_1p_user_batch[i][0]:top_preds_1p_user_batch[i][1] for i in range(0,len(top_preds_1p_user_batch)) }
+    return top_preds_batch, top_preds_1p_user_batch
 
 # Evaluate Predictions
-def evaluate_predictions(top_preds_batch, prediction_meta):
+def evaluate_predictions(top_preds_batch, top_preds_1p_user_batch, prediction_meta):
+    top_preds_1p_user_batch = sorted(top_preds_1p_user_batch.items(), key=lambda x: x[1]['score'], reverse=True)
+    top_preds_1p_user_batch = [ top_preds_1p_user_batch[i][1] for i in range(0,len(top_preds_1p_user_batch)) ]
     total_number_samples_scored = prediction_meta['total_class_0'] + prediction_meta['total_class_1']
     random_accuracy = float(prediction_meta['total_class_1']) / float(total_number_samples_scored)
-    min_threshold = 0; num_points = 50
-    increment = int((len(top_preds_batch) - min_threshold) / float(num_points))
-    xs = []; ys = []
-    for i in range(0,num_points+1):
-        index = min_threshold + increment * i
-        top_batch = top_preds_batch[0:index]
-        num_correct_top_preds_batch = float(sum([ x['correct'] for x in top_batch ]))
-        num_samples_top_preds_batch = float(len(top_batch))
-        accuracy_top_preds_batch = num_correct_top_preds_batch / num_samples_top_preds_batch if num_samples_top_preds_batch > 0 else 0.0
-        xs.append(index)
-        ys.append(accuracy_top_preds_batch)
-        if i == num_points:
-            print('Total number scored samples: ' + str(total_number_samples_scored))
-            print('Sample size top_preds_batch: ' + str(num_samples_top_preds_batch))
-            print('Accuracy top_preds_batch: ' + str(accuracy_top_preds_batch))
-            print('Random class 1 accuracy: ' + str(random_accuracy))
-    pcts = [ '%.1f'%(100*(xs[i] / float(total_number_samples_scored))) + '%' for i in range(0,len(xs)) ]
-    f, ax = plt.subplots(1)
-    plt.scatter(xs[1:], ys[1:])
-    plt.plot(xs[1:], ys[1:], '-')
-    plt.plot([min(xs),max(xs)], [random_accuracy, random_accuracy], '-', c='r')
-    ax.set_ylim(ymin=0)
-    x_text_inds = [ xs[i] for i in range(0,len(xs)) if i % 10 == 0 ]
-    x_text_vals = [ pcts[i] for i in range(0,len(pcts)) if i % 10 == 0 ]
-    plt.xticks(x_text_inds, x_text_inds)
-    for i in range(0,len(x_text_inds)): ax.text(x_text_inds[i], -0.079, x_text_vals[i], size=6, ha='center')
-    plt.xlabel("Top scored set size", labelpad=15)
-    plt.ylabel('Class 1 accuracy')
-    f.subplots_adjust(bottom=0.22)
-    plt.savefig('top_scored_accuracy.png')
-    plt.show()
+    batches = {'top_preds':top_preds_batch, 'top_preds_1p_user':top_preds_1p_user_batch}
+    for batch_name in batches:
+        batch = batches[batch_name]
+        min_threshold = 0; num_points = 50
+        increment = int((len(batch) - min_threshold) / float(num_points))
+        total_number_samples_scored = total_number_samples_scored if batch_name == 'top_preds' else len(prediction_meta['users'])
+        xs = []; ys = []
+        for i in range(0,num_points+1):
+            index = min_threshold + increment * i
+            top_batch = batch[0:index]
+            num_correct_batch = float(sum([ x['correct'] for x in top_batch ]))
+            num_samples_batch = float(len(top_batch))
+            accuracy_batch = num_correct_batch / num_samples_batch if num_samples_batch > 0 else 0.0
+            xs.append(index)
+            ys.append(accuracy_batch)
+            if i == num_points:
+                print('\nBatch name: ' + batch_name)
+                print('Total number scored samples: ' + str(total_number_samples_scored))
+                print('Sample size top_preds_batch: ' + str(num_samples_batch))
+                print('Accuracy top_preds_batch: ' + str(accuracy_batch))
+                print('Random class 1 accuracy: ' + str(random_accuracy))
+        pcts = [ '%.1f'%(100*(xs[i] / float(total_number_samples_scored))) + '%' for i in range(0,len(xs)) ]
+        f, ax = plt.subplots(1)
+        plt.scatter(xs[1:], ys[1:])
+        plt.plot(xs[1:], ys[1:], '-')
+        plt.plot([min(xs),max(xs)], [random_accuracy, random_accuracy], '-', c='r')
+        ax.set_ylim(ymin=0)
+        x_text_inds = [ xs[i] for i in range(0,len(xs)) if i % 10 == 0 ]
+        x_text_vals = [ pcts[i] for i in range(0,len(pcts)) if i % 10 == 0 ]
+        plt.xticks(x_text_inds, x_text_inds)
+        for i in range(0,len(x_text_inds)): ax.text(x_text_inds[i], -0.079, x_text_vals[i], size=6, ha='center')
+        plt.xlabel("Top scored set size", labelpad=15)
+        plt.ylabel('Class 1 accuracy')
+        title = 'top_scored_accuracy_' + batch_name
+        plt.title(title)
+        f.subplots_adjust(bottom=0.22)
+        plt.savefig(title + '.png')
+        plt.show()
     return 
 
 ############
@@ -177,11 +204,12 @@ if len(sys.argv) != 2: print(error_msg); sys.exit()
 if sys.argv[1] not in arg_options: print(error_msg); sys.exit()
 mode = sys.argv[1]; batch_size = 50000 #100000
 
-prediction_meta = {'total_class_0':0, 'total_class_1':0}
+prediction_meta = {'total_class_0':0, 'total_class_1':0, 'users':{}}
 if mode == 'eval': clf = load_classifier()
 
+top_preds_batch = []; top_preds_1p_user_batch = {}
 f = open(mode + '_data.txt', 'r')
-c = 0; top_preds_batch = []
+c = 0
 while True:
     df = load_data(f, batch_size)
     c += len(df)
@@ -201,15 +229,15 @@ while True:
     if mode == 'eval':
         df_x, df_y, df_context = split_to_inputs_outputs(df)
         df_x = sort_dataframe_columns(df_x)
-        predictions = generate_predictions(clf, df_x, df_y)
-        top_preds_batch = isolate_top_predictions(predictions, top_preds_batch, prediction_meta, top_n=50000)
+        predictions = generate_predictions(clf, df_x, df_y, df_context)
+        top_preds_batch, top_preds_1p_user_batch = isolate_top_predictions(predictions, top_preds_batch, top_preds_1p_user_batch, prediction_meta, top_n=50000)
 
-        #evaluate_predictions(top_preds_batch, prediction_meta)
+        #evaluate_predictions(top_preds_batch, top_preds_1p_user_batch, prediction_meta)
         #sys.exit()
 
     if (len(df) != batch_size) or (mode == 'train'): break
     else: print('processed rows: ' + str(c))
 
 f.close()
-if mode == 'eval': evaluate_predictions(top_preds_batch, prediction_meta)
+if mode == 'eval': evaluate_predictions(top_preds_batch, top_preds_1p_user_batch, prediction_meta)
 print('end time: ' + str(datetime.now()) + '\n')
