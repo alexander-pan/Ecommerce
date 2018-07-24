@@ -89,3 +89,5 @@ For the data gathered, the time period should be distinct from training. Here ar
  - lookfront_window: '30'
 
 Only samples from the latest reference date in the returned dataset are kept. These are then used for the evaluation described at the end of the motivation section above. We can then visualize these results with a couple of charts.
+
+![Top scored accuracy top preds](https://github.com/alexander-pan/Ecommerce/blob/master/scripts/Challenger_1/top_scored_accuracy_top_preds.png)
