@@ -1,17 +1,23 @@
 # Challenger 1 Recommender System
 
-This folder contains scripts used for implementing recommender based on Extremely Randomized Trees
+This folder contains scripts used for implementing a recommender system based on the Extremely Randomized Trees algorithm.
 
 ## Motivation
 
-Our client wishes to leverage their retail data on users' past purchases to inform future marketing decisions. In particular, the client has the ability to send out promotion material as granular as on the department level. For this reason, we constructed a model with the aim of predicting the "relative probability" (a score) that on a given reference date, a user will purchases an item within a specified department within the next 30 days. If we wished to send promotion material to every user, the idea would be to send them an item in the department where they have the highest score. If we wished to send promotion material with a maximum volume constraint = n, the idea would be to determine each users' highest scored department, and then send the top n user-department pairs from that set.
+Our client wishes to leverage their retail data on users' past purchases to inform future marketing decisions. In particular, the client has the ability to send out promotion material on as granular as the department level. For this reason, we constructed a model with the aim of predicting the "relative probability" (a score) that on a given reference date, a user will purchase an item within a specified department within the next 30 days. If we wished to send promotion material to every user, the idea would be to send each user an item in the department where they have the highest score. If we wished to send promotion material with a maximum volume constraint = n, the idea would be to determine each users' highest scored department, and then send the top n user-department pairs from that set.
 
 ## Input Features
 
 The input features for the model are gathered over a 60 day window prior (lookback window) to the reference date. Additionally, input feature definitions can be broken into several groupings.
 
 ### Continuous Reference Level Features
-The continuous fields looked at are: original_retail_price_amt, shipped_cost_amt, shipped_sold_amt, margin, discount, markdown
+Reference level features are those calculated at the reference user-department-date level. The continuous fields used are: 
+ - original_retail_price_amt
+ - shipped_cost_amt
+ - shipped_sold_amt
+ - margin
+ - discount
+ - markdown
 For each of those fields, we caluculated:
  - The sum of their past amounts over all departments
  - The sum of their past amounts within the reference department
