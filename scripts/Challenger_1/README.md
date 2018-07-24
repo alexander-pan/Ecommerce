@@ -51,7 +51,7 @@ The basic categorical fields used are:
  - first_web_order_date
  - prior_order_date
 
-For each of those basic fields, we caluculated:
+For each of those basic fields, we calculated:
  - An binary indicator telling whether a past date exists
 
 ## Training
@@ -81,17 +81,20 @@ Like training, this evaluation requires two steps:
  2) [Model Training](https://github.com/alexander-pan/Ecommerce/blob/master/scripts/Challenger_1/modeling.py) (run with: modeling.py eval)
 
 For the data gathered, the time period should be distinct from training. Here are example parameters used for our analysis:
- - num_users: '3000'
  - min_date: '2018-03-17'
  - max_date: '2018-04-17'
  - valid_departments: "('Knit Tops','Woven Shirts','Dresses','Pants')"
  - lookback_window: '60'
  - lookfront_window: '30'
 
-Only samples from the latest reference date in the returned dataset are kept. These are then used for the evaluation described at the end of the motivation section above. We can then visualize these results with a couple of charts. The first chart below has, on the y-axis, the prediction accuracy of class 1 (the class where a user does purchase an item from the reference department within the 30 day period after the reference date). On the x-axis is the number of top-scored samples evaluated. The percentages below each tick mark are the x-value divided by the total number of samples scored. As expected of a functioning model, we can see the curve (blue) decrease as x increases. The red line is the percentage of class 1 samples over the whole dataset gathered, so it acts as a random-guess baseline. 
+Only samples from the latest reference date in the returned dataset are kept. Specifically, this yielded a bit over 1 million samples (user-department pairs) to evaluate. This set of samples was then used for the evaluation described at the end of the motivation section above. To visualize this analysis, we can use a couple of charts.
+
+ The first chart below has, on the y-axis, the prediction accuracy of class 1 (the class where a user does purchase an item from the reference department within the 30 day period after the reference date). On the x-axis is the number of top-scored samples evaluated. The percentages below each tick mark are the x-value divided by the total number of samples scored. As expected of a functioning model, we can see the curve (blue) decrease as x increases. The red line is the percentage of class 1 samples over the whole dataset gathered, so it acts as a random-guess baseline. 
 
 ![Top scored accuracy top preds](https://github.com/alexander-pan/Ecommerce/blob/master/scripts/Challenger_1/top_scored_accuracy_top_preds.png)
 
 Instead of looking at all scored samples, the next chart below only looks at the best score for each user (so resulting subset only has 1 department for each user). Using that subset of data, we create a plot using the same methods as the chart above. Again, we can see the curve (blue) decrease as x increases.
 
 ![Top scored accuracy top preds 1 per user](https://github.com/alexander-pan/Ecommerce/blob/master/scripts/Challenger_1/top_scored_accuracy_top_preds_1p_user.png)
+
+With these results, we can see that if were to score roughly 1 million users-department pairs and then only consider the best department for each user, 39% of the top 50,000 pairs would make a purchase in their top department within the next 30 days. This is a 2.44x lift over a random selection of 50,000 pairs (that set having the random-guess baseline percentage of 16%). Likewise, the top 10,000 would have a 3.13x lift. Therefore, using this model, we can proceed by setting up a forward test that would send out promotion material for these groups of the top 50k or 10k user-department pairs (and analyze the performance lift).
