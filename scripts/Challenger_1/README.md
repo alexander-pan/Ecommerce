@@ -88,6 +88,10 @@ For the data gathered, the time period should be distinct from training. Here ar
  - lookback_window: '60'
  - lookfront_window: '30'
 
-Only samples from the latest reference date in the returned dataset are kept. These are then used for the evaluation described at the end of the motivation section above. We can then visualize these results with a couple of charts.
+Only samples from the latest reference date in the returned dataset are kept. These are then used for the evaluation described at the end of the motivation section above. We can then visualize these results with a couple of charts. The first chart below has the prediction accuracy of class 1 (the class where a user does purchase an item from the reference department within the next 30 days after the reference date) on the y-axis. On the x-axis is the number of top-scored samples evaluated. The percentages below each tick mark are the x-value divided by the total number of samples scored. As expected of a functioning model, we can see the curve (blue) decrease as x increases. The red line is the percentage of class 1 sample over the whole dataset gathered, so it acts as a random-guess baseline. 
 
 ![Top scored accuracy top preds](https://github.com/alexander-pan/Ecommerce/blob/master/scripts/Challenger_1/top_scored_accuracy_top_preds.png)
+
+Instead of looking at all scored samples, the next chart below only looks at the best score for each user. Using that subset of data, we create a plot using the same methods as the above chart. Again, we can see the curve (blue) decrease as x increases.
+
+![Top scored accuracy top preds 1 per user](https://github.com/alexander-pan/Ecommerce/blob/master/scripts/Challenger_1/top_scored_accuracy_top_preds_1p_user.png)
