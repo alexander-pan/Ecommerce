@@ -8,54 +8,59 @@ Our client wishes to leverage their retail data on users' past purchases to info
 
 ## Input Features
 
-The input features for the model are gathered over a 60 day window prior (lookback window) to the reference date. Additionally, input feature definitions can be broken into several groupings.
+The input features for the model are gathered over a 60 day window prior (lookback window) to the reference date. Additionally, input feature definitions can be broken into groupings.
 
-### Continuous Reference Level Features
-Reference level features are those calculated at the reference user-department-date level. The continuous fields used are: 
+### Continuous Features
+The basic continuous fields used are: 
  - original_retail_price_amt
  - shipped_cost_amt
  - shipped_sold_amt
  - margin
  - discount
  - markdown
-For each of those fields, we caluculated:
- - The sum of their past amounts over all departments
- - The sum of their past amounts within the reference department
- - The mean of their past amounts over all departments
- - The mean of their past amounts within the reference department
- Additionally, we calculated:
- - Days since most recent order over all departments
- - Days since most recent order within the reference department
- - Average number of days between orders over all departments
- - Average number of days between orders within the reference department
- - The number of past orders over all departments
- - The number of past orders within the reference department
+
+For each of those basic fields, we calculated:
+ - The sum of their past amounts for the user, within the reference department
+ - The sum of their past amounts for the user, over all departments
+ - The sum of their past amounts over all orders within the reference department
+ - The mean of their past amounts for the user, within the reference department
+ - The mean of their past amounts for the user, over all departments
+ - The mean of their past amounts over all orders within the reference department
+
+We also calculated:
+ - Days since most recent order for the user, within the reference department
+ - Days since most recent order for the user, over all departments
+ - Average number of days between orders for the user, within the reference department
+ - Average number of days between orders for the user, over all departments
+ - The number of past orders for the user, within the reference department
+ - The number of past orders for the user, over all departments
  - The user's age
 
-### Continuous Department Level Features
-The continuous fields looked at are: original_retail_price_amt, shipped_cost_amt, shipped_sold_amt, margin, discount, markdown
-For each of those fields, we caluculated:
- - The sum of their past amounts over all orders within the reference department
- - The mean of their past amounts over all orders within the reference department
-Additionally, for each field below, we calulated the percentage of orders fitting that category, within the reference department 
+Additionally, for each categorical fields below, we calulated the percentage of orders fitting the field's subcategory, over all orders within the reference department 
  - fabric_category_desc: [Cotton/Cotton Bl, Synthetic/Syn Blend, Linen/Linen Bl],
- - pay_type_cd: [VISA, MC, DISC, CASH, DEBIT, JJC, CK],
- - end_use_desc: [Core, Wearever, Pure Jill],
- - price_cd: [SP, FP],
+ - pay_type_cd: [VISA, MC, DISC, CASH, DEBIT, JJC, CK]
+ - end_use_desc: [Core, Wearever, Pure Jill]
+ - price_cd: [SP, FP]
  - master_channel: [D, R]
 
-### Categorical Reference Level Features
-The fields used for these features are: first_order_date, first_catalog_order_date, first_retail_order_date, first_web_order_date, prior_order_date
-For each of those fields, we caluculated:
+### Categorical Features
+The basic categorical fields used are: 
+ - first_order_date
+ - first_catalog_order_date
+ - first_retail_order_date
+ - first_web_order_date
+ - prior_order_date
+
+For each of those basic fields, we caluculated:
  - An binary indicator telling whether a past date exists
 
 ## Training
 Training the model requires two steps:
 
- 1) **Data Gathering:** [gather_data.py](https://github.com/alexander-pan/Ecommerce/blob/master/scripts/Challenger_1/gather_data.py) (run with: gather_data.py train)
- 2) **Model Training:**  [modeling.py](https://github.com/alexander-pan/Ecommerce/blob/master/scripts/Challenger_1/modeling.py) (run with: modeling.py train)
+ 1) [Data Gathering](https://github.com/alexander-pan/Ecommerce/blob/master/scripts/Challenger_1/gather_data.py) (run with: gather_data.py train)
+ 2) [Model Training](https://github.com/alexander-pan/Ecommerce/blob/master/scripts/Challenger_1/modeling.py) (run with: modeling.py train)
 
-For the data gathering step, parameters defining the training set need to be defined. Those parameters (with example training values given) are:
+For the data gathering step, parameters for the training set must be defined. These parameters (with training values given) are:
  - num_users: '3000'
  - min_date: '2017-10-01'
  - max_date: '2018-02-10'
@@ -63,17 +68,17 @@ For the data gathering step, parameters defining the training set need to be def
  - lookback_window: '60'
  - lookfront_window: '30'
 
-As a note, num_users = 3000 here does not mean there are only 3000 samples. There will actually be a data sample for each date (call reference date) falling between the min_date and max_date, a cross join between the 3000 users, references dates, and departments in valid_departments. Some of those tuples, however, are removed if they are closer than lookfront_window to the max_date or lookback_window to the min_date.
+Note: num_users = 3000 does not mean there are only 3000 samples. There will actually be a data sample for each row in the cross join of each date (reference date) falling between the min_date and max_date, the 3000 users, and the departments in valid_departments. Some of those tuples, however, are removed if they are closer than lookfront_window to the max_date or lookback_window to the min_date.
 
-For the model training step, the model used is an Extremely Randomized Trees classifier (please see [here](http://scikit-learn.org/stable/modules/ensemble.html#forest) for details). Tree ensemble classifiers tend fall midway on the bias-variance spectrum, so they are good general purpose models that can capture a good deal of nonlinearity. Jjill does possess a large amount of data, which might suggest that a "deep learning" type approach might be appropriate, but suitable hardware & environment requirements (gpus, db with high performance, etc) should first be met before considering such an approach. 
+For the modeling step, our data is randomized and class-balanced before splitting into training & evaluation sets (70% training; the training & evaluation sets contain samples from completely distinct users). The model used is an Extremely Randomized Trees classifier (please see [here](http://scikit-learn.org/stable/modules/ensemble.html#forest) for details). Tree ensemble classifiers tend fall midway on the bias-variance spectrum, so they are good general purpose models that can capture a good deal of nonlinearity. Jjill does possess a large amount of data, which might suggest that a "deep learning" type approach might be appropriate, but suitable hardware & environment requirements (gpus, db with high performance, etc.) should first be met before considering such an approach. 
 
-As output from training, some evaluation metrics are provided. Using a evaluation set of data samples involving users who are distinct from the training set users, we subsample from that set to create a class-balanced subset. We then assess the prediction accuracy (# of correct predictions / # of predictions) on the subset and compare it to the random of 50%. For a model using the variables defined above, our prediction accuracy came out to ~66%. 
+As output from training, some evaluation metrics are provided. Using the evaluation set mentioned above, we assess the prediction accuracy (# of correct predictions / # of predictions) on the set and compare it to the random accuracy of 50%. For a model using the variables defined above, our prediction accuracy comes out to ~66%. 
  
 ## Evaluation (Top N Performance)
 Like training, this evaluation requires two steps: 
 
- 1) **Data Gathering:** [gather_data.py](https://github.com/alexander-pan/Ecommerce/blob/master/scripts/Challenger_1/gather_data.py) (run with: gather_data.py eval)
- 2) **Model Training:**  [modeling.py](https://github.com/alexander-pan/Ecommerce/blob/master/scripts/Challenger_1/modeling.py) (run with: modeling.py eval)
+ 1) [Data Gathering](https://github.com/alexander-pan/Ecommerce/blob/master/scripts/Challenger_1/gather_data.py) (run with: gather_data.py eval)
+ 2) [Model Training](https://github.com/alexander-pan/Ecommerce/blob/master/scripts/Challenger_1/modeling.py) (run with: modeling.py eval)
 
 For the data gathered, the time period should be distinct from training. Here are example parameters used for our analysis:
  - num_users: '3000'
@@ -83,4 +88,4 @@ For the data gathered, the time period should be distinct from training. Here ar
  - lookback_window: '60'
  - lookfront_window: '30'
 
-Only samples from the latest reference date in the returned dataset are kept. These are then used for the evaluation described at the end of the motivation section above. We can visualize these results with a couple of charts.
+Only samples from the latest reference date in the returned dataset are kept. These are then used for the evaluation described at the end of the motivation section above. We can then visualize these results with a couple of charts.
