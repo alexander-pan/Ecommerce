@@ -23,20 +23,14 @@ def define_continuous_ref_level_vars(params):
     numerical_vars = ['original_retail_price_amt', 'shipped_cost_amt', 'shipped_sold_amt', 'margin', 'discount', 'markdown']
     numerical_vars_fields = [
         {
-            'sum_past_' + x: {'definition': "sum(CASE WHEN t2." + x + " = '' THEN 0.0 ELSE t2." + x + "::float END)::float",
-                              'default_value': 0.0},
-            'sum_past_' + x + '_in_department': {'definition': """sum(CASE WHEN t1.department_name != t2.department_name THEN 0.0 
+            f + '_past_' + x: {'definition': f + "(CASE WHEN t2." + x + " = '' THEN 0.0 ELSE t2." + x + "::float END)::float",
+                               'default_value': 0.0},
+            f + '_past_' + x + '_in_department': {'definition': f + """(CASE WHEN t1.department_name != t2.department_name THEN 0.0 
                                                                                   WHEN t2.""" + x + """ = '' THEN 0.0 
                                                                                   ELSE t2.""" + x + """::float END)::float""",
-                                                 'default_value': 0.0},
-            'avg_past_' + x: {'definition': "avg(CASE WHEN t2." + x + " = '' THEN 0.0 ELSE t2." + x + "::float END)::float",
-                              'default_value': 0.0},
-            'avg_past_' + x + '_in_department': {'definition': """avg(CASE WHEN t1.department_name != t2.department_name THEN 0.0 
-                                                                                  WHEN t2.""" + x + """ = '' THEN 0.0 
-                                                                                  ELSE t2.""" + x + """::float END)::float""",
-                                                 'default_value': 0.0}
+                                                  'default_value': 0.0}
         }
-        for x in numerical_vars
+        for x in numerical_vars for f in ['sum', 'avg']
     ]
     numerical_vars_fields.append(
         {
@@ -45,46 +39,20 @@ def define_continuous_ref_level_vars(params):
             'most_recent_past_order_days_ago_in_department': {'definition': """min(CASE WHEN t1.department_name != t2.department_name THEN """ + max_date_diff + """
                                                                                         ELSE t1.ref_date - t2.order_date END)::float""",
                                                               'default_value': max_date_diff},
-
             'num_past_orders': {'definition': 'count(t2.order_date)::float',
                                 'default_value': 0.0},
             'num_past_orders_in_department': {'definition': 'sum(CASE WHEN t1.department_name != t2.department_name THEN 0 ELSE 1 END)::float',
                                               'default_value': 0.0},
+            'user_age': {'definition': "(max(t1.ref_date - t2.birth_date) / 365.0)::float",
+                         'default_value': 0.0},
         }
     )
     return numerical_vars, numerical_vars_fields
 
-# Defining Categorical Variables On The Sample Reference Level
-def define_categorical_ref_level_vars():
-    categorical_vars = {
-        # 'day_of_the_wk': ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
-        # 'color_family_desc': ['Blue', 'Black', 'White/Ivory', 'Grey', 'Pink', 'Green'],
-        # 'fabric_category_desc': ['Cotton/Cotton Bl', 'Synthetic/Syn Blend' ,'Linen/Linen Bl'],
-        # 'pay_type_cd': ['VISA', 'MC', 'DISC', 'CASH', 'DEBIT', 'JJC', 'CK'],
-        # 'end_use_desc': ['Core', 'Wearever', 'Pure Jill'],
-        # 'price_cd': ['SP', 'FP'],
-        # 'master_channel': ['D', 'R']
-        # 'is_jjch_ind': ['Y'],
-        # 'is_callable_ind': ['Y']
-    }
-    categorical_vars_fields = [
-        {
-            # 'has_' + x + '_' + y.split(' ')[0].split('/')[0].lower(): {'definition': "max(CASE WHEN t2." + x + " IN ('" + y + "') THEN 1.0 ELSE 0.0 END)::float",
-            #                                                            'default_value': 0.0},
-            'prop_' + x + '_' + y.split(' ')[0].split('/')[0].lower(): {'definition': """(CASE WHEN count(t2.ilink)::int = 0 THEN 0.0
-                                                                                               ELSE sum(CASE WHEN t2.""" + x + """ IN ('""" + y + """') THEN 1.0 
-                                                                                                             ELSE 0.0 END) / count(t2.ilink)::float
-                                                                                          END)::float""",
-                                                                        'default_value': 0.0}
-        }
-        for x in categorical_vars for y in categorical_vars[x]
-    ]
-    return categorical_vars, categorical_vars_fields
-
-# Defining Other Binary Variables On The Sample Reference Level
-def define_other_binary_ref_level_vars():
-    other_binary_vars = ['first_order_date', 'first_catalog_order_date', 'first_retail_order_date', 'first_web_order_date', 'prior_order_date']
-    other_binary_vars_fields = [
+# Defining Binary Variables On The Sample Reference Level
+def define_binary_ref_level_vars():
+    binary_vars = ['first_order_date', 'first_catalog_order_date', 'first_retail_order_date', 'first_web_order_date', 'prior_order_date']
+    binary_vars_fields = [
         {
             'past_' + x + '_exists': {'definition': "max(CASE WHEN (t2." + x + " IS NOT NULL) AND (t2." + x + "::text != '') THEN 1.0 ELSE 0.0 END)::float",
                                       'default_value': 0.0},
@@ -93,9 +61,9 @@ def define_other_binary_ref_level_vars():
                                                                           ELSE 0.0 END)::float""",
                                                     'default_value': 0.0}
         }
-        for x in other_binary_vars
+        for x in binary_vars
     ]
-    return other_binary_vars, other_binary_vars_fields
+    return binary_vars, binary_vars_fields
 
 # Defining All Variables On The Department Level
 def define_department_level_vars(numerical_vars):
@@ -103,8 +71,6 @@ def define_department_level_vars(numerical_vars):
     for x in numerical_vars:
         department_vars['department_avg_' + x] = 'avg(' + x + ')'
     department_categorical_vars = {
-        #'day_of_the_wk': ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
-        #'color_family_desc': ['Blue', 'Black', 'White/Ivory', 'Grey', 'Pink', 'Green'],
         'fabric_category_desc': ['Cotton/Cotton Bl', 'Synthetic/Syn Blend' ,'Linen/Linen Bl'],
         'pay_type_cd': ['VISA', 'MC', 'DISC', 'CASH', 'DEBIT', 'JJC', 'CK'],
         'end_use_desc': ['Core', 'Wearever', 'Pure Jill'],
@@ -120,49 +86,27 @@ def define_department_level_vars(numerical_vars):
 # Defining Any Other Variables Not Fitting In The Above Categories
 def define_other_vars(params):
     other_vars = {
-
-        'ref_season_winter': {'definition': "max(CASE WHEN split_part(t1.ref_date::date, '-', 2)::int IN (12,1,2) THEN 1.0 ELSE 0.0 END)::float",
-                              'default_value': 0.0},
-        'ref_season_spring': {'definition': "max(CASE WHEN split_part(t1.ref_date::date, '-', 2)::int IN (3,4,5) THEN 1.0 ELSE 0.0 END)::float",
-                              'default_value': 0.0},
-        'ref_season_summer': {'definition': "max(CASE WHEN split_part(t1.ref_date::date, '-', 2)::int IN (6,7,8) THEN 1.0 ELSE 0.0 END)::float",
-                              'default_value': 0.0},
-        'ref_season_fall': {'definition': "max(CASE WHEN split_part(t1.ref_date::date, '-', 2)::int IN (9,10,11) THEN 1.0 ELSE 0.0 END)::float",
-                            'default_value': 0.0},
-
-        'user_age': {'definition': "(max(t1.ref_date - t2.birth_date) / 365.0)::float",
-                     'default_value': 0.0},
-
         'past_order_dates': {'definition': "listagg(distinct t2.order_date, ' ')",
                              'default_value': ''},
         'past_order_dates_in_department': {'definition': "listagg(distinct (CASE WHEN t1.department_name != t2.department_name THEN NULL ELSE t2.order_date END), ' ')",
                                            'default_value': ''}
     }
-    # valid_departments = ast.literal_eval(params['valid_departments'])
-    # for x in valid_departments:
-    #     key = 'ref_department_' + x.replace(' ','_').lower()
-    #     other_vars[key] = {'definition': "max(CASE WHEN t1.department_name = '" + x + "' THEN 1.0 ELSE 0.0 END)::float",
-    #                        'default_value': 0.0}
     return other_vars
 
 # Combining All Variables
-def combine_vars(numerical_vars_fields, categorical_vars_fields, other_binary_vars_fields, other_vars):
+def combine_vars(numerical_vars_fields, binary_vars_fields, other_vars):
     output_vars = {}
-    for i in range(0,len(numerical_vars_fields)): 
-        for y in numerical_vars_fields[i]:
-            output_vars[y] = numerical_vars_fields[i][y]
-    for i in range(0,len(categorical_vars_fields)): 
-        for y in categorical_vars_fields[i]:
-            output_vars[y] = categorical_vars_fields[i][y]
-    for i in range(0,len(other_binary_vars_fields)): 
-        for y in other_binary_vars_fields[i]:
-            output_vars[y] = other_binary_vars_fields[i][y]
-    for x in other_vars:
-        output_vars[x] = other_vars[x]
+    fields_list = [numerical_vars_fields, binary_vars_fields]
+    for fields in fields_list:
+        for i in range(0,len(fields)): 
+            for y in fields[i]:
+                output_vars[y] = fields[i][y]
+    for x in other_vars: output_vars[x] = other_vars[x]
     return output_vars
 
 # Adjusting Data For Query
 def adjust_dates(dbu, params):
+    dates = {}
     df = dbu.get_df_from_query("""
         SELECT min(order_date) AS min_date, max(order_date) AS max_date
         FROM jjill.jjill_keyed_data
@@ -170,22 +114,34 @@ def adjust_dates(dbu, params):
         AND order_date::date <= '""" + params['max_date'] + """'
     """)
     for i, row in df.iterrows(): date_extremas = { x:str(dict(row)[x]) for x in dict(row) }
-    dates = {}
-    dates['min_reference_date'] = str(datetime.strptime(date_extremas['min_date'], '%Y-%m-%d') + timedelta(days=int(params['lookback_window']))).split(' ')[0]
-    dates['max_reference_date'] = str(datetime.strptime(date_extremas['max_date'], '%Y-%m-%d') - timedelta(days=int(params['lookfront_window']))).split(' ')[0]
-    max_possible_min_data_date = str(datetime.strptime(dates['max_reference_date'], '%Y-%m-%d') - timedelta(days=int(params['lookback_window']))).split(' ')[0]
-    dates['min_data_date'] = date_extremas['min_date'] if date_extremas['min_date'] < max_possible_min_data_date else max_possible_min_data_date
-    dates['max_data_date'] = date_extremas['max_date']
-    if params['mode'] == 'eval':
-        dates['min_data_date'] = max_possible_min_data_date
-        dates['min_reference_date'] = dates['max_reference_date']
+
+    # Ensuring only samples from most current date possible created for production mode
+    if params['mode'] == 'production':
+        dates['min_data_date'] = str(datetime.strptime(date_extremas['max_date'], '%Y-%m-%d') - timedelta(days=int(params['lookback_window']))).split(' ')[0]
+        dates['max_data_date'] = date_extremas['max_date']
+        dates['min_reference_date'] = date_extremas['max_date']
+        dates['max_reference_date'] = date_extremas['max_date']
+
+    # Handling train and eval modes
+    else:
+        # Ensuring minimum (earliest) reference date has a full lookback window & maximum (latest) reference date has a full lookfront window
+        dates['min_reference_date'] = str(datetime.strptime(date_extremas['min_date'], '%Y-%m-%d') + timedelta(days=int(params['lookback_window']))).split(' ')[0]
+        dates['max_reference_date'] = str(datetime.strptime(date_extremas['max_date'], '%Y-%m-%d') - timedelta(days=int(params['lookfront_window']))).split(' ')[0]
+        # Ensuring earliest date where data is collect at is at least a full lookback window away from the minimum reference date
+        max_possible_min_data_date = str(datetime.strptime(dates['max_reference_date'], '%Y-%m-%d') - timedelta(days=int(params['lookback_window']))).split(' ')[0]
+        dates['min_data_date'] = date_extremas['min_date'] if date_extremas['min_date'] < max_possible_min_data_date else max_possible_min_data_date
+        dates['max_data_date'] = date_extremas['max_date']
+        # Ensuring we are only creating samples for maximum reference date during eval mode
+        if params['mode'] == 'eval':
+            dates['min_data_date'] = max_possible_min_data_date
+            dates['min_reference_date'] = dates['max_reference_date']
+
     pprint(dates)
-    if dates['max_reference_date'] < dates['min_reference_date']: 
-        print('invalid date range'); sys.exit()
+    if dates['max_reference_date'] < dates['min_reference_date']: print('invalid date range'); sys.exit()
     return dates
 
-# Adding Data Types To Fields
-def adding_field_data_types(dbu, columns):
+# Associating Reference Fields With Data Types
+def associating_ref_fields_with_data_types(dbu, columns):
     df = dbu.get_df_from_query("""
         SET search_path TO 'jjill';
         SELECT *
@@ -206,7 +162,7 @@ def create_reference_table(dbu, dates, department_vars, params):
     print('\nrunning reference data queries...')
     user_limit = params['num_users'] if params['mode'] == 'train' else str(1000000)
     columns = ['ilink', 'department_name', 'ref_date'] + sorted([ x for x in department_vars ])
-    column_types = adding_field_data_types(dbu, columns)
+    column_types = associating_ref_fields_with_data_types(dbu, columns)
     dbu.update_db("""
         DROP TABLE IF EXISTS jjill.jjill_reference_data;
         CREATE TABLE jjill.jjill_reference_data
@@ -220,7 +176,7 @@ def create_reference_table(dbu, dates, department_vars, params):
         WITH all_users AS (
             SELECT ilink
             FROM jjill.jjill_keyed_data
-            WHERE department_name in ('Knit Tops','Woven Shirts','Dresses','Pants')
+            WHERE department_name in """ + params['valid_departments'] + """
             AND is_emailable_ind='Y'
             AND order_date::date >= '""" + dates['min_data_date'] + """'
             AND order_date::date <= '""" + dates['max_reference_date'] + """'
@@ -295,10 +251,7 @@ def columns_from_sql(sql):
     return columns
 
 # Running SQL To Gather Training / Prediction Data
-def run_data_query(output_vars, department_vars, params, dbu):
-
-    # Adjusting Data For Query
-    dates = adjust_dates(dbu, params)
+def run_data_query(output_vars, department_vars, params, dates, dbu):
 
     # Create Temporary Reference Table
     create_reference_table(dbu, dates, department_vars, params)
@@ -369,11 +322,7 @@ def save_data(queried_data, columns, output_vars, params):
     class_sizes = {0:0, 1:0}; c = 0; n_estimate = 20000
     for item in queried_data:
         row = dict(zip(columns, item))
-
-        ###
         row = distinct_order_date_based_variables(row, output_vars)
-        ###
-
         class_sizes[row['outcome']] += 1
         if c == n_estimate:
             majority_class = max(class_sizes, key=class_sizes.get)
@@ -396,30 +345,30 @@ def save_data(queried_data, columns, output_vars, params):
 ############
 
 print('\nstart time: ' + str(datetime.now()))
-arg_options = ['train', 'eval']
+arg_options = ['train', 'eval', 'production']
 error_msg = 'script requires 1 argument: {' + '|'.join(arg_options) + '}'
 if len(sys.argv) != 2: print(error_msg); sys.exit()
 if sys.argv[1] not in arg_options: print(error_msg); sys.exit()
 
+dbu = DBUtil("jjill_redshift","C:\Users\Terry\Desktop\KT_GitHub\databases\databases.conf")
 params = {
-    'num_users': '3000',
+    'num_users': '3000', # only used during training
     'min_date': '2017-10-01',
-    'max_date': '2018-02-10', #'2018-02-10' for train; '2018-04-17' for eval
-    'valid_departments': "('Knit Tops','Woven Shirts','Dresses','Pants')",
+    'max_date': str(datetime.now().date()), # '2018-02-10' for train; '2018-04-17' for eval; str(datetime.now().date()) for production 
+    'valid_departments': "('Knit Tops', 'Woven Shirts', 'Dresses', 'Pants')",
     'lookback_window': '60',
     'lookfront_window': '30',
     'mode': sys.argv[1]
 }
-dbu = DBUtil("jjill_redshift","C:\Users\Terry\Desktop\KT_GitHub\databases\databases.conf")
+dates = adjust_dates(dbu, params)
 
 numerical_vars, numerical_vars_fields = define_continuous_ref_level_vars(params)
-categorical_vars, categorical_vars_fields = define_categorical_ref_level_vars()
-other_binary_vars, other_binary_vars_fields = define_other_binary_ref_level_vars()
+binary_vars, binary_vars_fields = define_binary_ref_level_vars()
 department_vars = define_department_level_vars(numerical_vars)
 other_vars = define_other_vars(params)
-output_vars = combine_vars(numerical_vars_fields, categorical_vars_fields, other_binary_vars_fields, other_vars)
+output_vars = combine_vars(numerical_vars_fields, binary_vars_fields, other_vars)
 
-queried_data, columns = run_data_query(output_vars, department_vars, params, dbu)
+queried_data, columns = run_data_query(output_vars, department_vars, params, dates, dbu)
 save_data(queried_data, columns, output_vars, params)
 
 print('end time: ' + str(datetime.now()) + '\n')
