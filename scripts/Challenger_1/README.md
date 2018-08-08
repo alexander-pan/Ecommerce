@@ -91,7 +91,7 @@ Only samples from the latest reference date in the returned dataset are kept. Sp
 
  The first chart below has, on the y-axis, the prediction accuracy of class 1 (the class where a user does purchase an item from the reference department within the 30 day period after the reference date). On the x-axis is the number of top-scored samples evaluated. The percentages below each tick mark are the x-value divided by the total number of samples scored. As expected of a functioning model, we can see the curve (blue) decrease as x increases. The red line is the percentage of class 1 samples over the whole dataset gathered, so it acts as a random-guess baseline. 
 
-![Top scored accuracy top preds](https://github.com/alexander-pan/Ecommerce/blob/master/scripts/Challenger_1/top_scored_accuracy_top_preds.png)
+![Top scored accuracy top preds](https://github.com/alexander-pan/Ecommerce/blob/master/scripts/Challenger_1/top_scored_accuracy_top_preds_all.png)
 
 Instead of looking at all scored samples, the next chart below only looks at the best score for each user (so resulting subset only has 1 department for each user). Using that subset of data, we create a plot using the same methods as the chart above. Again, we can see the curve (blue) decrease as x increases.
 
