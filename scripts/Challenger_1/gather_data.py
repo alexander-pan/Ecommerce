@@ -509,7 +509,7 @@ if sys.argv[1] == 'train':
     params = {
         'data_format': 'flat', # 'sql' once gathering from database
         'data_flat_file_path': 'master26_2017_2018.csv',
-        'num_users': '4000',
+        'num_users': '3000',
         'min_date': '2018-03-01',
         'max_date': '2018-07-01', 
         'valid_departments': "('Knit Tops', 'Woven Shirts', 'Dresses', 'Pants')",

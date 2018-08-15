@@ -16,10 +16,11 @@ import pickle
 import json
 import math
 import dill
+import ast
 import sys
 
 sys.path.append('../../utils')
-from db_utils import DBUtil
+#from db_utils import DBUtil
 
 #################
 ##  FUNCTIONS  ##
@@ -29,7 +30,8 @@ from db_utils import DBUtil
 def load_data(f, batch_size):
     df = []
     for line in f:
-        row = json.loads(line.replace('\n', ''))
+        row = ast.literal_eval(line.replace('\n', ''))
+        #row = json.loads(line.replace('\n', ''))
         df.append(row)
         if len(df) == batch_size: break
     df = pd.DataFrame(df)
