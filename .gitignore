@@ -109,8 +109,10 @@ venv.bak/
 # datafiles
 train_data.txt
 eval_data.txt
+production_data.txt
+production_predictions.txt
 model.p
-
+master26*
 
 
 

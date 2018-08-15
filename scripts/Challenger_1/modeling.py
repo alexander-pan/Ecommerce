@@ -13,7 +13,7 @@ from pprint import pprint
 import pandas as pd
 import numpy as np
 import pickle
-import ujson
+import json
 import math
 import dill
 import sys
@@ -29,7 +29,7 @@ from db_utils import DBUtil
 def load_data(f, batch_size):
     df = []
     for line in f:
-        row = ujson.loads(line.replace('\n', ''))
+        row = json.loads(line.replace('\n', ''))
         df.append(row)
         if len(df) == batch_size: break
     df = pd.DataFrame(df)
@@ -274,8 +274,8 @@ while True:
         predictions = generate_predictions(clf, df_x, df_y, df_context)
         store_predictions(predictions, f_out)
 
+    print('processed rows: ' + str(c))
     if (len(df) != batch_size) or (mode == 'train'): break
-    else: print('processed rows: ' + str(c))
 
 f.close()
 if mode == 'eval': evaluate_predictions(top_preds_batch, top_preds_1p_user_batch, prediction_meta, top_n)

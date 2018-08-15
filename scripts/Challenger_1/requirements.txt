@@ -1,0 +1,15 @@
+# Requirements.txt for Jjill Challenger_1 model
+# Please create a virtualenv via: virtualenv {env_name}
+# Navigate to {env_name}\Scripts
+# Start your env with: activate
+# Navigate to the requirements.txt
+# Then run: pip install -r requirements.txt 
+
+pprint
+numpy>=1.11.3
+pandas>=0.19.2
+dill>=0.2.8.2
+matplotlib>=2.0.1
+scikit-learn==0.19.2
+sklearn>=0.0
+pandasql>=0.7.3
