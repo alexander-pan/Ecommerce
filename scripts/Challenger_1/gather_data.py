@@ -9,6 +9,7 @@ from pprint import pprint
 import pandas as pd
 import numpy as np
 import shutil
+import math
 import json
 import ast
 import sys
@@ -34,7 +35,8 @@ def extract_zip_file(f_name):
 def handle_input_data_file_header(row, fs, header, m, output_base_vars):
     header = { i:row[i].lower() for i in range(0,len(row)) if row[i].lower() in output_base_vars }
     header_fields = sorted([header[key] for key in header], reverse=False)
-    if m == 1: fs.write(str(header_fields) + '\n')
+    if m == 1: 
+        for key in fs: fs[key].write(str(header_fields) + '\n')
     pprint(header)
     # pprint(sorted(row))
     # sys.exit()
@@ -47,7 +49,7 @@ def handle_input_data_file_row(row, fs, header, header_fields, m, cs, users, par
     if (row['order_date'] >= params['min_date']) and (row['order_date'] <= params['max_date']):
         if m == 1: 
             if row['ilink'] not in users: return cs, max_date, True
-            fs.write(str([ row[header_fields[i]] for i in range(0,len(header_fields)) ]) + '\n')
+            fs[users[row['ilink']]].write(str([ row[header_fields[i]] for i in range(0,len(header_fields)) ]) + '\n')
             cs += 1
         if m == 0: 
             if len(users) < 2000000: users[row['ilink']] = 1
@@ -55,14 +57,26 @@ def handle_input_data_file_row(row, fs, header, header_fields, m, cs, users, par
             cs += 1
     return cs, max_date, False
 
-def handle_pre_scanned_file_info(users, params, fsu, f_name_sampled, max_date):
+def handle_pre_scanned_file_info(users, params, f_name_sampled, f_name_sampled_ilinks, max_date):
     print('number of users seen: ' + str(len(users)))
     users = [ x for x in users ]
     shuffle(users)
     users = users[0:int(params['num_users'])]
     users = { x:1 for x in users }
-    fsu.write(str(users)); fsu.close()
+    users = [ x for x in users ]
+    shuffle(users)
+    batch_size = 100000
+    num_user_files = int(math.ceil(len(users) / float(batch_size)))
+    users_new = {}
+    for i in range(0,num_user_files):
+        users_batch = users[i*batch_size:(i+1)*batch_size]
+        for user in users_batch: users_new[user] = str(i)
+        fsu = open(f_name_sampled_ilinks + str(i) + '.csv', 'w')
+        fsu.write(str(users_batch))
+        fsu.close()
+    users = users_new
     print('number of users stored: ' + str(len(users)))
+    params['num_user_files'] = num_user_files
     params['data_flat_file_path'] = f_name_sampled
     if params['mode'] == 'production': 
         max_date_ts = datetime.strptime(max_date, '%Y-%m-%d')
@@ -74,23 +88,15 @@ def handle_pre_scanned_file_info(users, params, fsu, f_name_sampled, max_date):
 def prepare_input_files(params, output_base_vars):
     f_name = params['data_flat_file_path']
     if '.zip' in f_name: f_name = extract_zip_file(f_name)
-    sample_file_prefix = f_name.split('.csv')[0] + '_sampled'
-    f_name_sampled = sample_file_prefix + '.csv'
-    f_name_sampled_ilinks = sample_file_prefix + '_ilinks.csv'
+    f_name_sampled = f_name.split('.csv')[0] + '_sampled_'
+    f_name_sampled_ilinks = f_name_sampled + 'ilinks_'
     users = {}; max_date = '2000-01-01'
     for m in range(0,2):
-
-        # ###
-        # if m == 0: continue
-        # uu = open(f_name_sampled_ilinks, 'r')
-        # for line in uu: users = ast.literal_eval(line)
-        # uu.close()
-        # ###
-
         print('\nstarting loop ' + str('pre-scan' if m == 0 else 'store input data')); pprint(params)
         f = open(f_name, 'r')
-        fs = open(f_name_sampled, 'w')
-        if m == 0: fsu = open(f_name_sampled_ilinks, 'w')
+        fs = {}
+        if m == 1:
+            for i in range(0,params['num_user_files']): fs[str(i)] = open(f_name_sampled + str(i) + '.csv', 'w')
         header = 0; c = 0; cs = 0
         for line in f:
             row = line.replace('\n', '').split(',')
@@ -102,8 +108,8 @@ def prepare_input_files(params, output_base_vars):
             if c % 1000000 == 0: print('rows iterated over: ' + str(c) + '; rows stored: ' + str(cs))
         print('rows iterated over: ' + str(c) + '; rows stored: ' + str(cs))
         f.close()
-        fs.close()
-        if m == 0: users, params = handle_pre_scanned_file_info(users, params, fsu, f_name_sampled, max_date)
+        for key in fs: fs[key].close()
+        if m == 0: users, params = handle_pre_scanned_file_info(users, params, f_name_sampled, f_name_sampled_ilinks, max_date)
     return params
 
 # Converting File Of Sampled Data To Dataframe
@@ -179,14 +185,15 @@ def define_binary_ref_level_vars():
 # Defining All Variables On The Department Level
 def define_department_level_vars(numerical_vars):
     department_vars_fields = {}
-    for x in numerical_vars:
-        department_vars_fields['department_avg_' + x] = 'avg(' + x + ')'
+    # for x in numerical_vars:
+    #     department_vars_fields['department_avg_' + x] = 'avg(' + x + ')'
     department_categorical_vars = {
-        'fabric_category_desc': ['Cotton/Cotton Bl', 'Synthetic/Syn Blend' ,'Linen/Linen Bl'],
-        'pay_type_cd': ['VISA', 'MC', 'DISC', 'CASH', 'DEBIT', 'JJC', 'CK'],
-        'end_use_desc': ['Core', 'Wearever', 'Pure Jill'],
-        'price_cd': ['SP', 'FP'],
-        'master_channel': ['D', 'R']
+        # 'fabric_category_desc': ['Cotton/Cotton Bl', 'Synthetic/Syn Blend' ,'Linen/Linen Bl'],
+        # 'pay_type_cd': ['VISA', 'MC', 'DISC', 'CASH', 'DEBIT', 'JJC', 'CK'],
+        # 'end_use_desc': ['Core', 'Wearever', 'Pure Jill'],
+        # 'price_cd': ['SP', 'FP'],
+        # 'master_channel': ['D', 'R']
+        'department_name': ['Knit Tops', 'Woven Shirts', 'Dresses', 'Pants']
     }
     for x in department_categorical_vars:
         for y in department_categorical_vars[x]:
@@ -295,7 +302,7 @@ def create_reference_table(dbu, dates, department_vars_fields, params):
             AND order_date >= '""" + dates['min_data_date'] + """'
             AND order_date <= '""" + dates['max_reference_date'] + """'
             GROUP BY ilink
-            ORDER BY ilink
+            ORDER BY RANDOM()
             LIMIT """ + params['num_users'] + """
         ),
 
@@ -478,22 +485,20 @@ def format_output(row, f, class_sizes, c, n_estimate, output_vars, params):
     return c, class_sizes, False
 
 # Outputting Training / Prediction Data To A File
-def save_data(queried_data, columns, output_vars, params):
-    f = open(params['mode'] + '_data.txt','w')
+def save_data(queried_data, f_out, columns, output_vars, params):
     class_sizes = {0:0, 1:0, 'majority_class':'', 'balance_ratio':''}; 
     c = 0; n_estimate = 20000
     if params['data_format'] == 'sql':
         for item in queried_data:
             row = dict(zip(columns, item))
-            c, class_sizes, continue_bool = format_output(row, f, class_sizes, c, n_estimate, output_vars, params)
+            c, class_sizes, continue_bool = format_output(row, f_out, class_sizes, c, n_estimate, output_vars, params)
             if continue_bool == True: continue
     if params['data_format'] == 'flat': 
         for i, row in queried_data.iterrows():
             row = dict(row)
-            c, class_sizes, continue_bool = format_output(row, f, class_sizes, c, n_estimate, output_vars, params)
+            c, class_sizes, continue_bool = format_output(row, f_out, class_sizes, c, n_estimate, output_vars, params)
             if continue_bool == True: continue
     print('stored ' + str(c) + ' rows')   
-    f.close()
 
 ############
 ##  MAIN  ##
@@ -521,8 +526,8 @@ if sys.argv[1] == 'production':
     params = {
         'data_format': 'flat', # 'sql' once gathering from database
         'data_flat_file_path': 'master26_2017_2018.csv',
-        'num_users': '1000000',
-        'min_date': '2018-05-01',
+        'num_users': '500000',
+        'min_date': '2018-06-01',
         'max_date': str(datetime.now().date()),
         'valid_departments': "('Knit Tops', 'Woven Shirts', 'Dresses', 'Pants')",
         'lookback_window': '60',
@@ -536,15 +541,20 @@ department_categorical_vars, department_vars_fields = define_department_level_va
 other_vars_fields = define_other_vars(params)
 output_vars, output_base_vars = combine_vars(numerical_vars_fields, binary_vars_fields, other_vars_fields, numerical_vars, binary_vars, department_categorical_vars)
 
-if params['data_format'] == 'sql':
-    dbu = DBUtil("jjill_redshift", "C:\\Users\\Terry\\Desktop\\KT_GitHub\\databases\\databases.conf")
-if params['data_format'] == 'flat': 
-    params = prepare_input_files(params, output_base_vars)
-    dbu = flat_file_to_dataframe(params['data_flat_file_path'])
+if params['data_format'] == 'sql': params['num_user_files'] = 1
+if params['data_format'] == 'flat': params = prepare_input_files(params, output_base_vars)
+#params['num_user_files'] = 5
 
-dates = adjust_dates(dbu, params)
-ref_df = create_reference_table(dbu, dates, department_vars_fields, params)
-queried_data, columns = run_data_query(output_vars, department_vars_fields, params, dates, dbu, ref_df)
-save_data(queried_data, columns, output_vars, params)
+f_out = open(params['mode'] + '_data.txt','w')
+for i in range(0,params['num_user_files']):
+    print('\nprocessing file set: ' + str(i))
+    if params['data_format'] == 'sql': dbu = DBUtil("jjill_redshift", "C:\\Users\\Terry\\Desktop\\KT_GitHub\\databases\\databases.conf")
+    if params['data_format'] == 'flat': dbu = flat_file_to_dataframe(params['data_flat_file_path'] + str(i) + '.csv')
+    dates = adjust_dates(dbu, params)
+    ref_df = create_reference_table(dbu, dates, department_vars_fields, params)
+    queried_data, columns = run_data_query(output_vars, department_vars_fields, params, dates, dbu, ref_df)
+    save_data(queried_data, f_out, columns, output_vars, params)
+    dbu = ''; ref_df = ''; dbu = pysqldf("SELECT 1"); ref_df = pysqldf("SELECT 1"); queried_data = ''
+f_out.close()
 
 print('end time: ' + str(datetime.now()) + '\n')
