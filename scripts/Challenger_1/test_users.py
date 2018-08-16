@@ -47,7 +47,7 @@ def form_test_groups(u):
         for department in u[user]:
             percentile = u[user][department]['percentile']
             if percentile >= 0.5 and percentile <= 1.00: c_avg += 1
-            if percentile <= 0.2: c_low += 1
+            if percentile <= 0.25: c_low += 1
             if c_avg == 3 and c_low == 1: u_test[user] = u[user]
     return u_test
 
@@ -56,10 +56,11 @@ d = load_data()
 u, d = determine_department_percentiles(d)
 u_test = form_test_groups(u)
 
-print('\n' + str(len(u_test))); c = 0
+print('\nnumber original users: ' + str(len(u)))
+print('number valid testing users: ' + str(len(u_test))); c = 0
 for user in u_test:
     print('\n' + user)
     pprint(u_test[user])
     c += 1
-    if c == 3: break
+    if c == 2: break
 
