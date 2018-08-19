@@ -26,7 +26,16 @@ sys.path.append('../../utils')
 ##  FUNCTIONS  ##
 #################
 
-# Loading Data From Text File
+# Defines Whether Script Is Running In Train Or Production Mode
+def handle_initial_arguments(args):
+    print('\nstart time: ' + str(datetime.now()))
+    arg_options = ['train', 'eval', 'production']
+    error_msg = 'script requires 1 argument: {' + '|'.join(arg_options) + '}'
+    if len(args) != 2: print(error_msg); sys.exit()
+    if args[1] not in arg_options: print(error_msg); sys.exit()
+    return args[1]
+
+# Loading Data From Input Text File
 def load_data(f, batch_size):
     df = []
     for line in f:
@@ -72,13 +81,13 @@ def split_to_inputs_outputs(df):
     df_context = df[context]
     return df_x, df_y, df_context
 
-# Sorting DataFrame Columns
+# Sorting DataFrame Columns For Consistency
 def sort_dataframe_columns(df):
     sorted_columns = sorted(list(df.columns), reverse=False)
     df = df[sorted_columns]
     return df
 
-# Running Classifier
+# Training Classifier (Extremely Randomized Trees)
 def run_classifier(df_train_x, df_train_y):
     print('running classifier...')
     print('train sample size: ' + str(len(df_train_y)))
@@ -129,7 +138,7 @@ def generate_predictions(clf, df_x, df_y, df_context):
         predictions[key] = value
     return predictions
 
-# Isolate Top Predictions
+# Isolating Top Predictions
 def isolate_top_predictions(predictions, top_preds_batch, top_preds_1p_user_batch, prediction_meta, top_n=5000):
     for x in predictions:
         ilink, department_name = x.split(':')
@@ -214,7 +223,7 @@ def evaluate_predictions(top_preds_batch, top_preds_1p_user_batch, prediction_me
 
     return
 
-# Storing Predictions
+# Storing Predictions In Output File
 def store_predictions(predictions, f_out):
     for x in predictions:
         d = predictions[x]
@@ -222,63 +231,108 @@ def store_predictions(predictions, f_out):
         f_out.write(output + '\n')
     return 
 
+# Handing Training Process
+def handle_training_process(df):
+
+    # Randomizing Data
+    df = randomize_df(df)
+
+    # Splitting Data Into Train & Eval Sets
+    df_train, df_eval = split_to_train_eval(df)
+
+    # Balancing Classes In Dataset
+    df_train = class_balance_df(df_train)
+    df_eval = class_balance_df(df_eval)
+
+    # Splitting Dataset Into Inputs, Outputs, & Context
+    df_train_x, df_train_y, df_train_context = split_to_inputs_outputs(df_train)
+    df_eval_x, df_eval_y, df_eval_context = split_to_inputs_outputs(df_eval)
+
+    # Sorting DataFrame Columns For Consistency
+    df_train_x = sort_dataframe_columns(df_train_x)
+    df_eval_x = sort_dataframe_columns(df_eval_x)
+
+    # Training Classifier (Extremely Randomized Trees)
+    clf = run_classifier(df_train_x, df_train_y)
+
+    # Evaluate Classifier Performance
+    evaluate_model(clf, df_eval_x, df_eval_y)
+
+# Handling Evaluation Process
+def handle_evaluation_process(df, clf, top_preds_batch, top_preds_1p_user_batch, prediction_meta, top_n):
+
+    # Splitting Dataset Into Inputs, Outputs, & Context
+    df_x, df_y, df_context = split_to_inputs_outputs(df)
+
+    # Sorting DataFrame Columns For Consistency
+    df_x = sort_dataframe_columns(df_x)
+
+    # Generating Predictions With Classifier
+    predictions = generate_predictions(clf, df_x, df_y, df_context)
+
+    # Isolating Top Predictions
+    top_preds_batch, top_preds_1p_user_batch = isolate_top_predictions(predictions, top_preds_batch, top_preds_1p_user_batch, prediction_meta, top_n=top_n)
+
+    # Return
+    return top_preds_batch, top_preds_1p_user_batch, prediction_meta
+
+# Handling Production Process
+def handle_production_process(df, clf, f_out):
+
+    # Splitting Dataset Into Inputs, Outputs, & Context
+    df_x, df_y, df_context = split_to_inputs_outputs(df)
+
+    # Sorting DataFrame Columns For Consistency
+    df_x = sort_dataframe_columns(df_x)
+
+    # Generating Predictions With Classifier
+    predictions = generate_predictions(clf, df_x, df_y, df_context)
+
+    # Storing Predictions In Output File
+    store_predictions(predictions, f_out)
+
 ############
 ##  MAIN  ##
 ############
 
-print('\nstart time: ' + str(datetime.now()))
-arg_options = ['train', 'eval', 'production']
-error_msg = 'script requires 1 argument: {' + '|'.join(arg_options) + '}'
-if len(sys.argv) != 2: print(error_msg); sys.exit()
-if sys.argv[1] not in arg_options: print(error_msg); sys.exit()
-mode = sys.argv[1]; batch_size = 50000; top_n = 50000
+# Defines Whether Script Is Running In Train Or Production Mode
+mode = handle_initial_arguments(sys.argv)
+
+# Preparing Some Internal Data Structures
 if mode != 'train': clf = load_classifier()
 if mode == 'production': f_out = open('production_predictions.txt', 'w')
-
 top_preds_batch = {'all':[], 'Pants':[], 'Dresses':[], 'Woven Shirts':[], 'Knit Tops':[]}; 
 top_preds_1p_user_batch = {}
-prediction_meta = ['total_class_0', 'total_class_1']
-prediction_meta = { (x + '_' + y):0 for x in prediction_meta for y in top_preds_batch }
+prediction_meta = { (x + '_' + y):0 for x in ['total_class_0', 'total_class_1'] for y in top_preds_batch }
 prediction_meta['users'] = {} 
+
+# Defining Input Data File
 f = open(mode + '_data.txt', 'r')
-c = 0
+
+# Iterating Over Batches Of Data, Determined By Batch Size
+c = 0; batch_size = 50000; top_n = 50000
 while True:
+
+    # Loading Data From Input Text File
     df = load_data(f, batch_size)
     c += len(df)
 
-    # ###
-    # temp_df_sample = df.sample(n=100)
-    # temp_df_sample.to_csv('eval_data_sample.csv')
-    # sys.exit()
-    # ###
+    # Handing Training Process
+    if mode == 'train': handle_training_process(df)
 
-    if mode == 'train':
-        df = randomize_df(df)
-        df_train, df_eval = split_to_train_eval(df)
-        df_train = class_balance_df(df_train)
-        df_eval = class_balance_df(df_eval)
-        df_train_x, df_train_y, df_train_context = split_to_inputs_outputs(df_train)
-        df_eval_x, df_eval_y, df_eval_context = split_to_inputs_outputs(df_eval)
-        df_train_x = sort_dataframe_columns(df_train_x)
-        df_eval_x = sort_dataframe_columns(df_eval_x)
-        clf = run_classifier(df_train_x, df_train_y)
-        evaluate_model(clf, df_eval_x, df_eval_y)
+    # Handling Evaluation Process
+    if mode == 'eval': (top_preds_batch, 
+                        top_preds_1p_user_batch, 
+                        prediction_meta) = handle_evaluation_process(df, clf, top_preds_batch, top_preds_1p_user_batch, prediction_meta, top_n)      
 
-    if mode == 'eval':
-        df_x, df_y, df_context = split_to_inputs_outputs(df)
-        df_x = sort_dataframe_columns(df_x)
-        predictions = generate_predictions(clf, df_x, df_y, df_context)
-        top_preds_batch, top_preds_1p_user_batch = isolate_top_predictions(predictions, top_preds_batch, top_preds_1p_user_batch, prediction_meta, top_n=top_n)
+    # Handling Production Process
+    if mode == 'production': handle_production_process(df, clf, f_out)
 
-    if mode == 'production':
-        df_x, df_y, df_context = split_to_inputs_outputs(df)
-        df_x = sort_dataframe_columns(df_x)
-        predictions = generate_predictions(clf, df_x, df_y, df_context)
-        store_predictions(predictions, f_out)
-
+    # Determining Whether To Continue Looping Over Additional Batches
     print('processed rows: ' + str(c))
     if (len(df) != batch_size) or (mode == 'train'): break
 
+# Ending Script 
 f.close()
 if mode == 'eval': evaluate_predictions(top_preds_batch, top_preds_1p_user_batch, prediction_meta, top_n)
 print('end time: ' + str(datetime.now()) + '\n')
